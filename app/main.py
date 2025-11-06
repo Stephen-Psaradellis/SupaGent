@@ -40,15 +40,19 @@ def build_app() -> FastAPI:
 
     # Initialize components (stored on app.state for hot-reload capability)
     def _build_store(persist_dir: str | None = None) -> VectorStore:
+        # Default to Railway-friendly path, fallback to local development path
+        default_persist_dir = "/app/data/chroma" if os.getenv("RAILWAY_ENVIRONMENT") else "./data/chroma"
         return VectorStore(
-            persist_dir=persist_dir or os.getenv("CHROMA_PERSIST_DIR", "./data/chroma"),
+            persist_dir=persist_dir or os.getenv("CHROMA_PERSIST_DIR", default_persist_dir),
             embedding_model=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         )
 
     app.state.store = _build_store()
     app.state.mcp = MCPClient(app.state.store.similarity_search)
     app.state.rag = RAGAnswerer(app.state.mcp)
-    app.state.sessions = SessionStore(root_dir=os.getenv("SESSIONS_DIR", "./data/sessions"))
+    # Default to Railway-friendly path for sessions
+    default_sessions_dir = "/app/data/sessions" if os.getenv("RAILWAY_ENVIRONMENT") else "./data/sessions"
+    app.state.sessions = SessionStore(root_dir=os.getenv("SESSIONS_DIR", default_sessions_dir))
 
     # Helper function to create/register MCP server with ElevenLabs
     def create_or_get_mcp_server() -> Optional[str]:
@@ -128,7 +132,7 @@ def build_app() -> FastAPI:
         mcp_server_id = create_or_get_mcp_server()
         if mcp_server_id:
             os.environ["ELEVENLABS_MCP_SERVER_ID"] = mcp_server_id
-    
+
     # Auto-create ElevenLabs Agent if API key is present and no agent id provided
     if os.getenv("ELEVENLABS_API_KEY") and not os.getenv("ELEVENLABS_AGENT_ID"):
         try:
@@ -227,7 +231,7 @@ def build_app() -> FastAPI:
             return {
                 "success": False,
                 "error": error or "Failed to create/register MCP server. Check API key and network connectivity."
-            }
+        }
 
     @app.post("/query")
     def query(q: Query, session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -305,17 +309,26 @@ def build_app() -> FastAPI:
     @app.post("/admin/reload_store")
     def reload_store(persist_dir: Optional[str] = None) -> Dict[str, Any]:
         # Swap the store to a new directory (dataset) and rebuild dependencies
+        default_persist_dir = "/app/data/chroma" if os.getenv("RAILWAY_ENVIRONMENT") else "./data/chroma"
         app.state.store = VectorStore(
-            persist_dir=persist_dir or os.getenv("CHROMA_PERSIST_DIR", "./data/chroma"),
+            persist_dir=persist_dir or os.getenv("CHROMA_PERSIST_DIR", default_persist_dir),
             embedding_model=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         )
         app.state.mcp = MCPClient(app.state.store.similarity_search)
         app.state.rag = RAGAnswerer(app.state.mcp)
-        return {"ok": True, "persist_dir": persist_dir or os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")}
+        final_persist_dir = persist_dir or os.getenv("CHROMA_PERSIST_DIR", default_persist_dir)
+        return {"ok": True, "persist_dir": final_persist_dir}
 
     @app.get("/admin/status")
     def status() -> Dict[str, Any]:
-        return {"persist_dir": getattr(app.state.store, "_persist_dir", None) or os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")}
+        default_persist_dir = "/app/data/chroma" if os.getenv("RAILWAY_ENVIRONMENT") else "./data/chroma"
+        persist_dir = getattr(app.state.store, "_persist_dir", None) or os.getenv("CHROMA_PERSIST_DIR", default_persist_dir)
+        return {
+            "persist_dir": persist_dir,
+            "environment": os.getenv("RAILWAY_ENVIRONMENT", "local"),
+            "vector_backend": getattr(app.state.store, "_backend", "unknown"),
+            "has_data": os.path.exists(persist_dir) and len(os.listdir(persist_dir)) > 0 if os.path.exists(persist_dir) else False
+        }
 
     # Test endpoints for vector store and MCP connectivity
     @app.get("/test/vector_store")

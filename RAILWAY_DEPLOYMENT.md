@@ -18,11 +18,14 @@ In Railway's dashboard, add these environment variables:
 - `ELEVENLABS_API_KEY` - Your ElevenLabs API key
 - `ELEVENLABS_AGENT_ID` - Your agent ID (will be auto-created if not set)
 
-**Optional:**
-- `SUPAGENT_BASE_URL` - Leave empty to auto-detect Railway's public URL
-- `CHROMA_PERSIST_DIR` - Default: `/app/data/chroma` (persistent volume)
+**Optional (Auto-configured on Railway):**
+- `SUPAGENT_BASE_URL` - Auto-detected from `RAILWAY_PUBLIC_DOMAIN`
+- `CHROMA_PERSIST_DIR` - Auto-defaults to `/app/data/chroma` on Railway
+- `SESSIONS_DIR` - Auto-defaults to `/app/data/sessions` on Railway
 - `EMBEDDING_MODEL` - Default: `sentence-transformers/all-MiniLM-L6-v2`
 - `VECTOR_BACKEND` - `CHROMA` (default) or `FAISS`
+
+**Note:** The app automatically detects Railway environment and adjusts paths accordingly. You only need to set these if you want custom values.
 
 ### 3. Railway Auto-Detection
 
@@ -31,16 +34,19 @@ The app automatically detects Railway's public URL via the `RAILWAY_PUBLIC_DOMAI
 ### 4. Deploy
 
 Railway will:
-1. Detect your Python project
+1. Detect your Python project (via `Procfile` or auto-detection)
 2. Install dependencies from `requirements.txt`
-3. Run the app (Railway auto-detects FastAPI/uvicorn)
+3. Run the app using the `Procfile` start command
 
-**Start Command (if needed):**
+**Start Command (already in `Procfile`):**
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-Railway sets the `PORT` environment variable automatically.
+Railway sets the `PORT` environment variable automatically. The app will:
+- Auto-detect Railway environment and use `/app/data/chroma` for vector store
+- Auto-detect Railway public URL for MCP server configuration
+- Create MCP server automatically on startup
 
 ## Post-Deployment Steps
 
@@ -76,34 +82,127 @@ curl https://your-app-name.up.railway.app/test/full_chain?query=How+do+I+reset+m
 curl https://your-app-name.up.railway.app/config/eleven
 ```
 
-## Persistent Storage
+## Vector Store Hosting Options
 
-### Vector Store Data
+The vector store (Chroma or FAISS) needs persistent storage. Here are your options:
 
-Railway provides persistent volumes. Your vector store data will be stored at:
-- `/app/data/chroma` (default)
+### Option 1: Railway Persistent Volumes (Recommended)
 
-This persists across deployments.
+Railway provides persistent volumes that survive deployments and restarts.
 
-### Ingesting Documents
+**Setup:**
+1. In Railway dashboard → Your service → Settings → Volumes
+2. Create a new volume (e.g., `chroma-data`)
+3. Mount it to `/app/data/chroma`
+4. Set environment variable: `CHROMA_PERSIST_DIR=/app/data/chroma`
 
-You can ingest documents in two ways:
+**Pros:**
+- ✅ Simple setup
+- ✅ Data persists across deployments
+- ✅ No additional services needed
+- ✅ Fast local access
 
-**Option 1: Local ingestion, then deploy**
+**Cons:**
+- ⚠️ Limited by Railway's volume size limits
+- ⚠️ Data is tied to Railway service
+
+**Ingesting Documents:**
+```bash
+# After deployment, ingest documents
+railway run python -m tools.ingest --dir dataset
+```
+
+### Option 2: Railway Volume + Git (For Small Datasets)
+
+For small vector stores (< 100MB), you can commit the data to git:
+
 ```bash
 # Ingest locally
 python -m tools.ingest --dir dataset
 
-# Commit and push (data is in ./data/chroma)
+# Commit vector store data
 git add data/chroma
 git commit -m "Add vector store data"
 git push
 ```
 
-**Option 2: Ingest on Railway (using Railway CLI or one-off container)**
-```bash
-railway run python -m tools.ingest --dir dataset
-```
+**Pros:**
+- ✅ Version controlled
+- ✅ Easy to deploy
+- ✅ No volume setup needed
+
+**Cons:**
+- ⚠️ Only works for small datasets
+- ⚠️ Increases repo size
+- ⚠️ Slower deployments
+
+### Option 3: External Cloud Storage (Advanced)
+
+For large datasets or multi-region deployments, use cloud storage:
+
+**Using S3-compatible storage:**
+1. Store vector store files in S3/R2/etc.
+2. Download on startup or use a sync mechanism
+3. Modify `VectorStore` to support remote storage
+
+**Pros:**
+- ✅ Scalable
+- ✅ Can share across multiple instances
+- ✅ Backup-friendly
+
+**Cons:**
+- ⚠️ Requires code changes
+- ⚠️ More complex setup
+- ⚠️ Additional costs
+
+### Option 4: Managed Vector Database (Future)
+
+For production at scale, consider:
+- **Chroma Cloud** (when available)
+- **Pinecone**
+- **Weaviate Cloud**
+- **Qdrant Cloud**
+
+These would require modifying the `VectorStore` class to use their APIs.
+
+## Recommended Setup for Railway
+
+**For most use cases, use Option 1 (Railway Persistent Volumes):**
+
+1. **Create Volume:**
+   - Railway dashboard → Your service → Volumes → Create Volume
+   - Name: `chroma-data`
+   - Mount path: `/app/data/chroma`
+
+2. **Set Environment Variable:**
+   ```
+   CHROMA_PERSIST_DIR=/app/data/chroma
+   ```
+
+3. **Ingest Documents After Deployment:**
+   ```bash
+   railway run python -m tools.ingest --dir dataset
+   ```
+
+4. **Verify Storage:**
+   ```bash
+   # Check volume contents
+   railway run ls -la /app/data/chroma
+   
+   # Test vector store
+   curl https://your-app.up.railway.app/test/vector_store?query=password
+   ```
+
+## Storage Size Considerations
+
+- **Small datasets (< 1GB):** Railway volumes work well
+- **Medium datasets (1-10GB):** Railway volumes or cloud storage
+- **Large datasets (> 10GB):** Consider external storage or managed vector DB
+
+**Typical sizes:**
+- 100 documents: ~10-50MB
+- 1,000 documents: ~100-500MB
+- 10,000 documents: ~1-5GB
 
 ## Environment Variables Reference
 
