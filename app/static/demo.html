@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupaGent Voice Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    label, button { display: block; margin-top: 1rem; }
+    .sources { margin-top: 1rem; font-size: 0.9rem; }
+    .warning { color: #b45309; }
+    #convai_container {
+      min-height: 64px;
+      margin-bottom: 12px;
+      border: 1px dashed #ccc;
+      padding: 8px;
+      background-color: #f9f9f9;
+    }
+    #convai_container:empty::before {
+      content: "Loading widget...";
+      color: #999;
+      font-style: italic;
+    }
+    elevenlabs-convai {
+      display: block !important;
+      width: 100%;
+      min-height: 64px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SupaGent Voice Demo</h1>
+  <p>Ask a question. The backend uses RAG (via MCP) and speaks the result with an ElevenLabs Agent if configured, otherwise TTS/text.</p>
+
+  <!-- ElevenLabs ConvAI widget -->
+  <h2>Live Voice (ElevenLabs ConvAI)</h2>
+  <div style="margin:0.5rem 0; color:#555">Agent ID: <span id="agentIdLabel">(loading)</span></div>
+  <div id="convai_container" style="min-height:64px; margin-bottom: 12px;"></div>
+  <!-- The script is injected dynamically after we fetch agent_id -->
+
+  <label>
+    Question:
+    <input id="q" type="text" size="60" placeholder="How do I reset my password?" />
+  </label>
+  <label>
+    Session ID:
+    <input id="sid" type="text" size="40" placeholder="auto-generated" />
+  </label>
+  <label>
+    Optional voice_id (fallback TTS only):
+    <input id="voiceId" type="text" size="40" placeholder="" />
+  </label>
+  <button id="ask">Ask</button>
+
+  <h2>Or speak</h2>
+  <button id="rec">Start recording</button>
+  <button id="stop" disabled>Stop recording</button>
+  <div id="recStatus"></div>
+
+  <h2>Conversation</h2>
+  <div id="history" style="white-space:pre-wrap; border:1px solid #ddd; padding:0.75rem; min-height:6rem"></div>
+
+  <h2>Answer</h2>
+  <pre id="answer" style="white-space:pre-wrap"></pre>
+
+  <div class="sources" id="sources"></div>
+  <div class="warning" id="warnings"></div>
+
+  <h2>Audio</h2>
+  <audio id="player" controls></audio>
+
+  <script>
+    const askBtn = document.getElementById('ask');
+    const qEl = document.getElementById('q');
+    const voiceIdEl = document.getElementById('voiceId');
+    const sidEl = document.getElementById('sid');
+    const answerEl = document.getElementById('answer');
+    const sourcesEl = document.getElementById('sources');
+    const warningsEl = document.getElementById('warnings');
+    const historyEl = document.getElementById('history');
+    const player = document.getElementById('player');
+
+    const recBtn = document.getElementById('rec');
+    const stopBtn = document.getElementById('stop');
+    const recStatus = document.getElementById('recStatus');
+
+    let mediaRecorder;
+    let chunks = [];
+
+    function ensureSid() {
+      if (!sidEl.value.trim()) sidEl.value = crypto.randomUUID();
+      return sidEl.value.trim();
+    }
+
+    function appendHistory(role, text) {
+      const prev = historyEl.textContent ? historyEl.textContent + "\n" : "";
+      historyEl.textContent = prev + `${role.toUpperCase()}: ${text}`;
+    }
+
+    async function ask() {
+      const question = qEl.value.trim();
+      const voice_id = voiceIdEl.value.trim() || null;
+      const session_id = ensureSid();
+      answerEl.textContent = '';
+      sourcesEl.textContent = '';
+      warningsEl.textContent = '';
+      player.src = '';
+
+      if (!question) return;
+
+      appendHistory('user', question);
+      const res = await fetch('/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, voice_id, session_id })
+      });
+
+      if (!res.ok) {
+        answerEl.textContent = 'Error: ' + res.status + ' ' + res.statusText;
+        return;
+      }
+      const data = await res.json();
+      answerEl.textContent = data.answer || '';
+      if (data.answer) appendHistory('assistant', data.answer);
+
+      if (Array.isArray(data.sources)) {
+        const html = data.sources.map((s, i) => {
+          const title = s.title || s.metadata?.title || `Source ${i+1}`;
+          const src = s.source || s.metadata?.source || '';
+          return `<div>• <strong>${title}</strong> — ${src}</div>`;
+        }).join('');
+        sourcesEl.innerHTML = html;
+      }
+
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        warningsEl.textContent = 'Warnings: ' + data.warnings.join('; ');
+      }
+
+      if (data.audio_base64) {
+        const blob = b64ToBlob(data.audio_base64, 'audio/mpeg');
+        const url = URL.createObjectURL(blob);
+        player.src = url;
+        player.play().catch(() => {});
+      }
+    }
+
+    function b64ToBlob(b64Data, contentType='audio/mpeg', sliceSize=512) {
+      const byteCharacters = atob(b64Data);
+      const byteArrays = [];
+      for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+      }
+      return new Blob(byteArrays, { type: contentType });
+    }
+
+    askBtn.addEventListener('click', ask);
+    qEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+
+    async function startRec() {
+      chunks = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        await sendAudio(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      recStatus.textContent = 'Recording...';
+      recBtn.disabled = true;
+      stopBtn.disabled = false;
+    }
+
+    function stopRec() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      recStatus.textContent = 'Processing...';
+      recBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+
+    async function sendAudio(blob) {
+      const form = new FormData();
+      form.append('file', blob, 'audio.webm');
+      // Provide fallback text for robustness
+      if (qEl.value.trim()) form.append('fallback_text', qEl.value.trim());
+      form.append('session_id', ensureSid());
+      const res = await fetch('/voice_from_audio', { method: 'POST', body: form });
+      const data = await res.json();
+      answerEl.textContent = data.answer || '';
+      if (data.answer) appendHistory('assistant', data.answer);
+      if (Array.isArray(data.sources)) {
+        const html = data.sources.map((s, i) => {
+          const title = s.title || s.metadata?.title || `Source ${i+1}`;
+          const src = s.source || s.metadata?.source || '';
+          return `<div>• <strong>${title}</strong> — ${src}</div>`;
+        }).join('');
+        sourcesEl.innerHTML = html;
+      }
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        warningsEl.textContent = 'Warnings: ' + data.warnings.join('; ');
+      } else {
+        warningsEl.textContent = '';
+      }
+      if (data.audio_base64) {
+        const blob = b64ToBlob(data.audio_base64, 'audio/mpeg');
+        const url = URL.createObjectURL(blob);
+        player.src = url;
+        player.play().catch(() => {});
+      }
+      recStatus.textContent = '';
+    }
+
+    recBtn.addEventListener('click', startRec);
+    stopBtn.addEventListener('click', stopRec);
+
+    // Inject ElevenLabs ConvAI widget after fetching agent_id and loading script
+    async function initConvAI() {
+      const host = document.getElementById('convai_container');
+      const lbl = document.getElementById('agentIdLabel');
+      try {
+        const res = await fetch('/config/eleven');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch config: ${res.status} ${res.statusText}`);
+        }
+        const cfg = await res.json();
+        const agent_id = cfg.agent_id;
+        if (!agent_id) {
+          if (lbl) lbl.textContent = '(no agent)';
+          if (cfg.error) {
+            console.warn('Agent setup error:', cfg.error);
+            if (host) {
+              host.innerHTML = `<div style="color: orange;">Warning: ${cfg.error}</div>`;
+            }
+          } else if (host) {
+            host.innerHTML = '<div style="color: #999;">No agent configured. Set ELEVENLABS_AGENT_ID in your environment.</div>';
+          }
+          return;
+        }
+        if (lbl) lbl.textContent = agent_id;
+        // Load the widget script, then create the element
+        // Check if script is already loaded
+        if (document.querySelector('script[src*="convai-widget-embed"]')) {
+          // Script already loaded, just create the element
+          createWidgetElement(agent_id);
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+        s.async = true;
+        s.type = 'text/javascript';
+        s.onload = async () => {
+          await createWidgetElement(agent_id);
+        };
+        s.onerror = (e) => {
+          console.error('Failed to load ElevenLabs widget script:', e);
+          if (host) {
+            host.innerHTML = '<div style="color: red;">Error: Failed to load widget script. Check your network connection and try refreshing.</div>';
+          }
+        };
+        document.body.appendChild(s);
+      } catch (e) {
+        console.error('ConvAI init failed', e);
+        if (host) {
+          host.innerHTML = `<div style="color: red;">Error initializing widget: ${e.message}</div>`;
+        }
+        if (lbl) lbl.textContent = '(error)';
+      }
+    }
+
+    async function createWidgetElement(agent_id) {
+      const host = document.getElementById('convai_container');
+      if (!host) {
+        console.error('convai_container element not found');
+        return;
+      }
+      // Wait for the custom element to be defined
+      let attempts = 0;
+      const maxAttempts = 50;
+      while (attempts < maxAttempts) {
+        if (customElements.get('elevenlabs-convai')) {
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      if (!customElements.get('elevenlabs-convai')) {
+        console.error('elevenlabs-convai custom element not defined after script load');
+        host.innerHTML = '<div style="color: red;">Error: Widget script failed to load. Check console for details.</div>';
+        return;
+      }
+      const el = document.createElement('elevenlabs-convai');
+      el.setAttribute('agent-id', agent_id);
+      el.style.display = 'block';
+      host.innerHTML = '';
+      host.appendChild(el);
+      console.log('ElevenLabs widget created with agent-id:', agent_id);
+    }
+
+    initConvAI();
+  </script>
+</body>
+</html>
