@@ -1,0 +1,786 @@
+# CI/CD settings | GitLab Docs
+
+Source: https://docs.gitlab.com/administration/settings/continuous_integration/#set-cicd-limits
+
+CI/CD settings | GitLab Docs
+CI/CD settings
+Tier
+: Free, Premium, Ultimate
+Offering
+: GitLab Self-Managed, GitLab Dedicated
+Configure CI/CD settings for your GitLab instance in the Admin area.
+The following settings are available:
+Variables: Configure CI/CD variables available to all projects in your instance.
+Continuous Integration and Deployment: Configure settings for Auto DevOps, jobs, artifacts, instance runners, and pipeline features.
+Package registry: Configure package forwarding and file size limits.
+Runners: Configure runner registration, version management, and token settings.
+Job token permissions: Control job token access across projects.
+Job logs: Configure job log settings like incremental logging.
+Access continuous integration and deployment settings
+Customize CI/CD settings, including Auto DevOps, instance runners, and job artifacts.
+To access these settings:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Continuous Integration and Deployment
+.
+Configure Auto DevOps for all projects
+Configure
+Auto DevOps
+to run for all projects that don’t have a
+.gitlab-ci.yml
+file.
+This applies to both existing projects and any new projects.
+To configure Auto DevOps for all projects in your instance:
+Select the
+Default to Auto DevOps pipeline for all projects
+checkbox.
+Optional. To use Auto Deploy and Auto Review Apps,
+specify the
+Auto DevOps base domain
+.
+Select
+Save changes
+.
+Instance runners
+Enable instance runners for new projects
+Make instance runners available to all new projects by default.
+To make instance runners available to new projects:
+Select the
+Enable instance runners for new projects
+checkbox.
+Select
+Save changes
+.
+Add details for instance runners
+Add explanatory text about the instance runners.
+This text appears in all projects’ runner settings.
+To add instance runner details:
+Enter text in the
+Instance runner details
+field. You can use Markdown formatting.
+Select
+Save changes
+.
+To view the rendered details:
+On the left sidebar, select
+Search or go to
+and find your project or group. If you’ve
+turned on the new navigation
+, this field is on the top bar.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Runners
+.
+Share project runners with multiple projects
+Share a project runner with multiple projects.
+Prerequisites:
+You must have a registered
+project runner
+.
+To share a project runner with multiple projects:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+From the left sidebar, select
+CI/CD
+>
+Runners
+.
+Select the runner you want to edit.
+In the upper-right corner, select
+Edit
+(
+pencil
+).
+Under
+Restrict projects for this runner
+, search for a project.
+To the left of the project, select
+Enable
+.
+Repeat this process for each additional project.
+Job artifacts
+Control how
+job artifacts
+are stored and managed across your GitLab instance.
+Set maximum artifacts size
+Set size limits for job artifacts to control storage use.
+Each artifact file in a job has a default maximum size of 100 MB.
+Job artifacts defined with
+artifacts:reports
+can have
+different limits
+.
+When different limits apply, the smaller value is used.
+This setting applies to the size of the final archive file, not individual files in a job.
+You can configure artifact size limits for:
+An instance: The base setting that applies to all projects and groups.
+A group: Overrides the instance setting for all projects in the group.
+A project: Overrides both instance and group settings for a specific project.
+For GitLab.com limits, see
+Artifacts maximum size
+.
+To change the maximum artifact size for an instance:
+Enter a value in the
+Maximum artifacts size (MB)
+field.
+Select
+Save changes
+.
+To change the maximum artifact size for a group or project:
+On the left sidebar, select
+Search or go to
+and find your project or group. If you’ve
+turned on the new navigation
+, this field is on the top bar.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+General pipelines
+.
+Change the value of
+Maximum artifacts size
+(in MB).
+Select
+Save changes
+.
+Set default artifacts expiration
+Set how long job artifacts are kept before being automatically deleted.
+The default expiration time is 30 days.
+The syntax for duration is described in
+artifacts:expire_in
+.
+Individual job definitions can override this default value in the project’s
+.gitlab-ci.yml
+file.
+Changes to this setting apply only to new artifacts. Existing artifacts keep their original expiration time.
+For information about manually expiring older artifacts,
+see the
+troubleshooting documentation
+.
+To set the default expiration time for job artifacts:
+Enter a value in the
+Default artifacts expiration
+field.
+Select
+Save changes
+.
+Keep artifacts from latest successful pipelines
+Preserve artifacts from the most recent successful pipeline
+for each Git ref (branch or tag), regardless of their expiration time.
+By default, this setting is turned on.
+This setting takes precedence over
+project settings
+.
+If turned off for an instance, it cannot be turned on for individual projects.
+When this feature is turned off, existing preserved artifacts don’t immediately expire.
+A new successful pipeline must run on a branch before its artifacts can expire.
+All application settings have a
+customizable cache expiry interval
+,
+which can delay the effect of settings changes.
+To keep artifacts from the latest successful pipelines:
+Select the
+Keep the latest artifacts for all jobs in the latest successful pipelines
+checkbox.
+Select
+Save changes
+.
+To allow artifacts to expire according to their expiration settings, clear the checkbox instead.
+Display or hide the external redirect warning page
+Control whether to display a warning page when users view job artifacts through GitLab Pages.
+This warning alerts about potential security risks from user-generated content.
+The external redirect warning page is displayed by default. To hide it:
+Clear the
+Enable the external redirect page for job artifacts
+checkbox.
+Select
+Save changes
+.
+Pipelines
+Archive pipelines
+Archive old pipelines and all their jobs automatically after a specified time period. Archived jobs:
+Display a lock icon (
+lock
+) and
+This job is archived
+at the top of the job log.
+Cannot be re-run or retried.
+Cannot run as
+on-stop deployment actions
+when environments auto-stop.
+Continue to have visible job logs.
+The archive duration is measured from the time the pipeline is created. It must be at least 1 day.
+Examples of valid durations include
+15 days
+,
+1 month
+, and
+2 years
+.
+Leave this field empty to never archive pipelines automatically.
+For GitLab.com, see
+Scheduled job archiving
+.
+To set up job archiving:
+Enter a value in the
+Archive pipelines
+field.
+Select
+Save changes
+.
+Allow pipeline variables by default
+History
+Introduced
+in GitLab 18.1.
+Control whether pipeline variables are allowed by default in new projects in new groups.
+When disabled, the
+default role to use pipeline variables
+setting is set to
+No one allowed
+for new groups, which cascades to new projects in the new groups.
+When enabled, the setting defaults to
+Developer
+instead.
+To keep the most secure defaults for new groups and projects, the recommendation is
+to set this setting to disabled.
+To allow pipeline variables by default in all new projects in new groups:
+Select the
+Allow pipeline variables by default in new groups
+checkbox.
+Select
+Save changes
+.
+After group or project creation, maintainers can choose a different setting.
+Protect CI/CD variables by default
+Set all new CI/CD variables in projects and groups to be protected by default.
+Protected variables are available only to pipelines that run on protected branches or protected tags.
+To protect all new CI/CD variables by default:
+Select the
+Protect CI/CD variables by default
+checkbox.
+Select
+Save changes
+.
+Set maximum includes
+History
+Introduced
+in GitLab 16.0.
+Limit how many external YAML files a pipeline can include using the
+include
+keyword
+.
+This limit prevents performance issues when pipelines include too many files.
+By default, a pipeline can include up to 150 files.
+When a pipeline exceeds this limit, it fails with an error.
+To set the maximum number of included files per pipeline:
+Enter a value in the
+Maximum includes
+field.
+Select
+Save changes
+.
+Limit downstream pipeline trigger rate
+History
+Introduced
+in GitLab 16.10.
+Restrict how many
+downstream pipelines
+can be triggered per minute from a single source.
+The maximum downstream pipeline trigger rate limits how many downstream pipelines
+can be triggered per minute for a given combination of project, user, and commit.
+The default value is
+0
+, which means there is no restriction.
+Pipeline limit per Git push
+History
+Introduced
+in GitLab 18.0.
+Set the maximum number of tag or branch pipelines that can be triggered by a single Git push.
+For more information about this limit, see
+number of pipelines per Git push
+.
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Continuous Integration and Deployment
+.
+Change the value of
+Pipeline limit per Git push
+.
+Select
+Save changes
+.
+Specify a default CI/CD configuration file
+Set a custom path and filename to use as the default for CI/CD configuration files in all new projects.
+By default, GitLab uses the
+.gitlab-ci.yml
+file in the project’s root directory.
+This setting applies only to new projects created after you change it.
+Existing projects continue to use their current CI/CD configuration file path.
+To set a custom default CI/CD configuration file path:
+Enter a value in the
+Default CI/CD configuration file
+field.
+Select
+Save changes
+.
+Individual projects can override this instance default by
+specifying a custom CI/CD configuration file
+.
+Display or hide the pipeline suggestion banner
+Control whether to display a guidance banner in merge requests that have no pipelines.
+This banner provides a walkthrough on how to add a
+.gitlab-ci.yml
+file.
+The pipeline suggestion banner is displayed by default. To hide it:
+Clear the
+Enable pipeline suggestion banner
+checkbox.
+Select
+Save changes
+.
+Display or hide the Jenkins migration banner
+History
+Introduced
+in GitLab 17.7.
+Control whether to display a banner encouraging migration from Jenkins to GitLab CI/CD.
+This banner appears in merge requests for projects that have the
+Jenkins integration enabled
+.
+The Jenkins migration banner is displayed by default. To hide it:
+Select the
+Show the migrate from Jenkins banner
+checkbox.
+Select
+Save changes
+.
+Set CI/CD limits
+History
+Maximum number of active pipelines per project
+setting
+removed
+in GitLab 16.0.
+Maximum number of instance-level CI/CD variables
+setting
+introduced
+in GitLab 17.1.
+Maximum size of a dotenv artifact in bytes
+setting
+introduced
+in GitLab 17.1.
+Maximum number of variables in a dotenv artifact
+setting
+introduced
+in GitLab 17.1.
+Maximum number of jobs in a single pipeline
+setting
+moved
+from GitLab Enterprise Edition to GitLab Community Edition in 17.6.
+Set CI/CD limits to control resource usage and help prevent performance issues.
+You can configure the following CI/CD limits:
+Maximum number of instance-level CI/CD variables
+Maximum size of a dotenv artifact in bytes
+Maximum number of variables in a dotenv artifact
+Maximum number of jobs in a single pipeline
+Total number of jobs in currently active pipelines
+Maximum number of pipeline subscriptions to and from a project
+Maximum number of pipeline schedules
+Maximum number of needs dependencies that a job can have
+Maximum number of runners created or active in a group during the past seven days
+Maximum number of runners created or active in a project during the past seven days
+Maximum number of downstream pipelines in a pipeline’s hierarchy tree
+For more information on what these limits control, see
+CI/CD limits
+.
+To configure CI/CD limits:
+Under
+CI/CD limits
+, set values for the limits you want to configure.
+Select
+Save changes
+.
+Access package registry settings
+Configure NuGet package validation, Helm package limits, package file size limits, and package forwarding.
+To access these settings:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Package registry
+.
+Skip NuGet package metadata URL validation
+Skip validation of the
+projectUrl
+,
+iconUrl
+, and
+licenseUrl
+metadata in NuGet packages.
+By default, GitLab validates these URLs. If your GitLab instance doesn’t have internet access,
+this validation fails and prevents you from uploading NuGet packages.
+To skip NuGet package metadata URL validation:
+Select the
+Skip metadata URL validation for the NuGet package
+checkbox.
+Select
+Save changes
+.
+Set maximum Helm packages per channel
+Set the maximum number of Helm packages that can be listed per channel.
+To set the Helm package limit:
+Under
+Package limits
+, enter a value in the
+Maximum number of Helm packages per channel
+field.
+Select
+Save changes
+.
+Set package file size limits
+Set maximum file size limits for each package type to control storage usage and maintain system performance.
+You can configure the maximum file size limits for the following packages, in bytes:
+Conan packages
+Helm charts
+Maven packages
+npm packages
+NuGet packages
+PyPI packages
+Terraform Module packages
+Generic packages
+To configure package file size limits:
+Under
+Package file size limits
+, enter values for the limits you want to configure.
+Select
+Save size limits
+.
+Control package forwarding
+Tier
+: Premium, Ultimate
+Offering
+: GitLab Self-Managed
+Control whether package requests are forwarded to public registries when packages aren’t found in your GitLab package registry.
+By default, GitLab forwards package requests to their respective public registries:
+Maven requests to
+Maven Central
+npm requests to
+npmjs.com
+PyPI requests to
+pypi.org
+To stop package forwarding:
+Clear any of these checkboxes:
+Forward Maven package requests to the Maven registry if the packages are not found in the GitLab Package registry
+Forward npm package requests to the npm registry if the packages are not found in the GitLab package registry
+Forward PyPI package requests to the PyPI registry if the packages are not found in the GitLab package registry
+Select
+Save changes
+.
+Access runner settings
+Configure runner version management and registration settings.
+To access these settings:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Runners
+.
+Control runner version management
+Control whether your instance fetches official runner version data from GitLab.com
+to
+determine if runners need upgrades
+.
+By default, GitLab fetches runner version data. To stop fetching this data:
+Under
+Runner version management
+, clear the
+Fetch GitLab Runner release version data from GitLab.com
+checkbox.
+Select
+Save changes
+.
+Control runner registration
+History
+Allow runner registration token
+setting
+introduced
+in GitLab 16.11.
+Control who can register runners and whether to allow registration tokens.
+The option to pass runner registration tokens and support for certain configuration arguments is considered legacy
+and is not recommended.
+Use the
+runner creation workflow
+to generate an authentication token to register runners. This process provides full
+traceability of runner ownership and enhances your runner fleet’s security.
+For more information, see
+Migrating to the new runner registration workflow
+.
+By default, runner registration tokens and both project and group member registration are allowed.
+To restrict runner registration:
+Under
+Runner registration
+, clear any of these checkboxes:
+Allow runner registration token
+Members of the project can create runners
+Members of the group can create runners
+Select
+Save changes
+.
+When you disable runner registration for project members, the registration
+token automatically rotates. The previous token becomes invalid and you must
+use the new registration token for the project.
+Restrict runner registration for a specific group
+Control whether members of a specific group can register runners.
+Prerequisites:
+The
+Members of the group can create runners
+checkbox
+must be selected in the
+runner registration settings
+.
+To restrict runner registration for a specific group:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Overview
+>
+Groups
+and find your group.
+Select
+Edit
+.
+Under
+Runner Registration
+, clear the
+New group runners can be registered
+checkbox.
+Select
+Save changes
+.
+Access job token permission settings
+Control how CI/CD job tokens can access your projects.
+To access these settings:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Job token permissions
+.
+Enforce job token allowlist
+History
+Introduced
+in GitLab 17.6.
+Require all projects to control job token access using an allowlist.
+When enforced, CI/CD job tokens can only access projects when the token’s source project is added to the project’s allowlist.
+For more information, see
+control job token access to your project
+.
+To enforce job token allowlists:
+Under
+Authorized groups and projects
+, select the
+Enable and enforce job token allowlist for all projects
+checkbox.
+Select
+Save changes
+.
+Access job log settings
+Control how CI/CD job logs are stored and processed.
+To access these settings:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand
+Job logs
+.
+Configure incremental logging
+History
+Instance setting
+introduced
+in GitLab 17.11, replacing the
+ci_enable_live_trace
+feature flag
+.
+ci_enable_live_trace
+feature flag
+removed
+in GitLab 18.0.
+Use Redis for temporary caching of job logs and incrementally upload archived logs to object storage.
+This improves performance and reduces disk space usage.
+For more information, see
+incremental logging
+.
+Prerequisites:
+You must
+configure object storage
+for CI/CD artifacts, logs, and builds.
+To turn on incremental logging for all projects:
+On the left sidebar, at the bottom, select
+Admin
+. If you’ve
+turned on the new navigation
+, in the upper-right corner, select your avatar and then select
+Admin
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand the
+Job logs
+section.
+Under
+Incremental logging configuration
+, select the
+Turn on incremental logging
+checkbox.
+Select
+Save changes
+.
+Required pipeline configuration (deprecated)
+Tier
+: Ultimate
+Offering
+: GitLab Self-Managed
+History
+Deprecated
+in GitLab 15.9.
+Removed
+in GitLab 17.0.
+Re-added
+in GitLab 17.4
+with a flag
+named
+required_pipelines
+. Disabled by default.
+This feature was
+deprecated
+in GitLab 15.9
+and was removed in 17.0. From 17.4, it is available only behind the feature flag
+required_pipelines
+, disabled by default.
+Use
+compliance pipelines
+instead. This change is a breaking change.
+You can set a
+CI/CD template
+as a required pipeline configuration for all projects on a GitLab instance. You can
+use a template from:
+The default CI/CD templates.
+A custom template stored in an
+instance template repository
+.
+When you use a configuration defined in an instance template repository,
+nested
+include:
+keywords
+(including
+include:file
+,
+include:local
+,
+include:remote
+, and
+include:template
+)
+do not work
+.
+The project CI/CD configuration merges into the required pipeline configuration when
+a pipeline runs. The merged configuration is the same as if the required pipeline configuration
+added the project configuration with the
+include
+keyword
+.
+To view a project’s full merged configuration,
+View full configuration
+in the pipeline editor.
+To select a CI/CD template for the required pipeline configuration:
+On the left sidebar, at the bottom, select
+Admin Area
+.
+Select
+Settings
+>
+CI/CD
+.
+Expand the
+Required pipeline configuration
+section.
+Select a CI/CD template from the dropdown list.
+Select
+Save changes
+.

@@ -1,0 +1,36 @@
+{"role": "user", "text": "Test question", "ts": 1762458885.107472}
+{"role": "assistant", "text": "Answer:\n\n\nCitations:\n", "ts": 1762458885.2878673}
+{"role": "user", "text": "How do I reset my password?", "ts": 1762458887.2177832}
+{"role": "assistant", "text": "Answer:\nReset your password via Settings [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762458887.2476783}
+{"role": "user", "text": "Hello", "ts": 1762458889.2578526}
+{"role": "assistant", "text": "Answer:\nReset your password via Settings. [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762458889.26794}
+{"role": "user", "text": "Stream it", "ts": 1762458890.279663}
+{"role": "user", "text": "fallback question", "ts": 1762458891.207047}
+{"role": "assistant", "text": "Answer:\nShipping delays occur during holidays. [1].\n\nCitations:\n[1] shipping\n[2] passwords", "ts": 1762458891.2155874}
+{"role": "user", "text": "Test question", "ts": 1762464407.7799754}
+{"role": "assistant", "text": "Question: Test question\n\nAnswer:\nAdditional details\n:\nIf a job does not specify a\nstage\n, the job is assigned the\ntest\nstage [1]. Example of\nstages\n:\nstages\n:\n-\nbuild\n-\ntest\n-\ndeploy\nIn this example:\nAll jobs in\nbuild\nexecute in parallel [1]. If all jobs in\nbuild\nsucceed, the\ntest\njobs execute in parallel [1].\n\nCitations:\n[1] CI-CD-YAML-syntax-reference-GitLab-Docs\n[2] Downstream-pipelines-GitLab-Docs", "ts": 1762464408.063589}
+{"role": "user", "text": "How do I reset my password?", "ts": 1762464410.0223484}
+{"role": "assistant", "text": "Question: How do I reset my password?\n\nAnswer:\nReset your password via Settings [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762464410.0502067}
+{"role": "user", "text": "Hello", "ts": 1762464412.0226638}
+{"role": "assistant", "text": "Question: Hello\n\nAnswer:\nReset your password via Settings. [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762464412.0321124}
+{"role": "user", "text": "Stream it", "ts": 1762464412.9939675}
+{"role": "user", "text": "fallback question", "ts": 1762464413.9900074}
+{"role": "assistant", "text": "Question: fallback question\n\nAnswer:\nShipping delays occur during holidays. [1].\n\nCitations:\n[1] shipping\n[2] passwords", "ts": 1762464414.004715}
+{"role": "user", "text": "Test question", "ts": 1762464941.9956543}
+{"role": "assistant", "text": "Question: Test question\n\nAnswer:\nAdditional details\n:\nIf a job does not specify a\nstage\n, the job is assigned the\ntest\nstage [1]. Example of\nstages\n:\nstages\n:\n-\nbuild\n-\ntest\n-\ndeploy\nIn this example:\nAll jobs in\nbuild\nexecute in parallel [1]. If all jobs in\nbuild\nsucceed, the\ntest\njobs execute in parallel [1].\n\nCitations:\n[1] CI-CD-YAML-syntax-reference-GitLab-Docs\n[2] Downstream-pipelines-GitLab-Docs", "ts": 1762464942.2003205}
+{"role": "user", "text": "How do I reset my password?", "ts": 1762464944.0936046}
+{"role": "assistant", "text": "Question: How do I reset my password?\n\nAnswer:\nReset your password via Settings [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762464944.1253707}
+{"role": "user", "text": "Hello", "ts": 1762464946.1935742}
+{"role": "assistant", "text": "Question: Hello\n\nAnswer:\nReset your password via Settings. [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762464946.2036793}
+{"role": "user", "text": "Stream it", "ts": 1762464947.1037698}
+{"role": "user", "text": "fallback question", "ts": 1762464948.0637147}
+{"role": "assistant", "text": "Question: fallback question\n\nAnswer:\nShipping delays occur during holidays. [1].\n\nCitations:\n[1] shipping\n[2] passwords", "ts": 1762464948.0757008}
+{"role": "user", "text": "Test question", "ts": 1762465049.821721}
+{"role": "assistant", "text": "Question: Test question\n\nAnswer:\nAdditional details\n:\nIf a job does not specify a\nstage\n, the job is assigned the\ntest\nstage [1]. Example of\nstages\n:\nstages\n:\n-\nbuild\n-\ntest\n-\ndeploy\nIn this example:\nAll jobs in\nbuild\nexecute in parallel [1]. If all jobs in\nbuild\nsucceed, the\ntest\njobs execute in parallel [1].\n\nCitations:\n[1] CI-CD-YAML-syntax-reference-GitLab-Docs\n[2] Downstream-pipelines-GitLab-Docs", "ts": 1762465050.0218868}
+{"role": "user", "text": "How do I reset my password?", "ts": 1762465051.9337487}
+{"role": "assistant", "text": "Question: How do I reset my password?\n\nAnswer:\nReset your password via Settings [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762465051.9702587}
+{"role": "user", "text": "Hello", "ts": 1762465053.894678}
+{"role": "assistant", "text": "Question: Hello\n\nAnswer:\nReset your password via Settings. [1].\n\nCitations:\n[1] passwords\n[2] shipping", "ts": 1762465053.9049752}
+{"role": "user", "text": "Stream it", "ts": 1762465054.8348882}
+{"role": "user", "text": "fallback question", "ts": 1762465055.834265}
+{"role": "assistant", "text": "Question: fallback question\n\nAnswer:\nShipping delays occur during holidays. [1].\n\nCitations:\n[1] shipping\n[2] passwords", "ts": 1762465055.850382}
