@@ -5,13 +5,20 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict
+import asyncio
+from typing import Any, Dict, Optional
+from collections import defaultdict
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import MCPDep
 
 logger = logging.getLogger(__name__)
+
+# Store active SSE connections and their response queues
+# Key: connection_id (from client IP or session), Value: asyncio.Queue for responses
+_sse_connections: Dict[str, asyncio.Queue] = {}
+_sse_connection_counter = 0
 from app.routes.mcp_handlers import (
     handle_search_knowledge_base,
     handle_create_ticket,
@@ -70,33 +77,32 @@ async def mcp_endpoint_get(
     if initialize_request:
         logger.info(f"Initialize request in query: {initialize_request}")
     
+    # Generate a unique connection ID for this SSE connection
+    global _sse_connection_counter
+    _sse_connection_counter += 1
+    connection_id = f"{request.client.host if request.client else 'unknown'}_{_sse_connection_counter}"
+    response_queue = asyncio.Queue()
+    _sse_connections[connection_id] = response_queue
+    logger.info(f"SSE connection established: {connection_id}")
+    
     async def event_stream():
-        logger.info("Starting SSE event stream")
+        logger.info(f"Starting SSE event stream for connection {connection_id}")
         
-        # For MCP with SSE transport, the protocol typically works like this:
-        # 1. Client connects via GET (this request)
-        # 2. Client sends initialize request (usually via POST, but could be in query params)
-        # 3. Server responds with initialize result
-        # 4. Client requests tools/list
-        # 5. Server responds with tools
-        
-        # Since we can't easily read from SSE stream in FastAPI, we handle requests via POST
-        # But we need to send an initial message to indicate the connection is ready
-        
-        # Send initial connection message in MCP format
-        # Some implementations send this, others wait for initialize
-        # Let's try sending a minimal ready signal
         try:
-            # Wait a brief moment to see if client sends initialize via query param
-            import asyncio
-            await asyncio.sleep(0.1)
+            # Send immediate connection message - MCP protocol expects this
+            connection_msg = {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+            }
+            yield f"data: {json.dumps(connection_msg)}\n\n"
+            logger.info(f"Sent connection initialized notification for {connection_id}")
             
-            # If there's an initialize request in query params, respond to it
+            # If there's an initialize request in query params, respond to it immediately
             if initialize_request:
                 try:
                     init_data = json.loads(initialize_request)
                     if init_data.get("method") == "initialize":
-                        logger.info("Responding to initialize from query params")
+                        logger.info(f"Responding to initialize from query params for {connection_id}")
                         response = {
                             "jsonrpc": "2.0",
                             "id": init_data.get("id"),
@@ -112,21 +118,38 @@ async def mcp_endpoint_get(
                             }
                         }
                         yield f"data: {json.dumps(response)}\n\n"
+                        logger.info(f"Sent initialize response for {connection_id}")
                 except (json.JSONDecodeError, KeyError) as e:
                     logger.warning(f"Failed to parse initialize request: {e}")
             
-            # Send periodic keepalives to maintain the SSE connection
-            # The actual MCP protocol messages will be handled via POST requests
+            # Monitor for responses to POST requests and send them through SSE
+            # Also send periodic keepalives
             keepalive_count = 0
             while True:
-                await asyncio.sleep(10)  # Send keepalive every 10 seconds
-                keepalive_count += 1
-                if keepalive_count % 6 == 0:  # Log every minute
-                    logger.info(f"SSE connection alive, keepalive #{keepalive_count}")
-                yield f": keepalive\n\n"
+                try:
+                    # Wait for either a response or timeout for keepalive
+                    try:
+                        response_data = await asyncio.wait_for(response_queue.get(), timeout=10.0)
+                        logger.info(f"Sending response through SSE for {connection_id}: {response_data.get('method', 'response')}")
+                        yield f"data: {json.dumps(response_data)}\n\n"
+                        response_queue.task_done()
+                    except asyncio.TimeoutError:
+                        # Timeout - send keepalive
+                        keepalive_count += 1
+                        if keepalive_count % 6 == 0:  # Log every minute
+                            logger.info(f"SSE connection alive for {connection_id}, keepalive #{keepalive_count}")
+                        yield f": keepalive\n\n"
+                except Exception as e:
+                    logger.error(f"Error in SSE stream for {connection_id}: {e}", exc_info=True)
+                    break
         except Exception as e:
-            logger.error(f"Error in SSE stream: {e}", exc_info=True)
+            logger.error(f"Error in SSE stream for {connection_id}: {e}", exc_info=True)
             raise
+        finally:
+            # Clean up connection
+            if connection_id in _sse_connections:
+                del _sse_connections[connection_id]
+                logger.info(f"SSE connection closed: {connection_id}")
     
     return StreamingResponse(
         event_stream(),
@@ -176,6 +199,27 @@ async def mcp_endpoint(
             response["result"] = result
         return response
     
+    # Try to send response through SSE if there's an active connection
+    # For SSE transport, responses should go through the SSE stream, not HTTP
+    client_ip = request.client.host if request.client else "unknown"
+    sse_connection = None
+    for conn_id, queue in _sse_connections.items():
+        if conn_id.startswith(client_ip):
+            sse_connection = queue
+            logger.info(f"Found SSE connection {conn_id} for POST request")
+            break
+    
+    async def send_response_via_sse_or_http(response: Dict[str, Any]) -> Dict[str, Any]:
+        """Send response through SSE if available, otherwise return HTTP response."""
+        if sse_connection:
+            try:
+                await sse_connection.put(response)
+                logger.info(f"Sent response via SSE: {response.get('method', 'response')}")
+                return {"status": "sent_via_sse"}
+            except Exception as e:
+                logger.warning(f"Failed to send via SSE, falling back to HTTP: {e}")
+        return response
+    
     if method == "initialize":
         # Handle initialize request - return server capabilities
         logger.info("Handling initialize request")
@@ -190,7 +234,8 @@ async def mcp_endpoint(
             }
         })
         logger.info(f"Initialize response: {json.dumps(response, indent=2)}")
-        return response
+        
+        return await send_response_via_sse_or_http(response)
     elif method == "tools/list":
         # Return available tools - this is a large list, kept here for now
         # Could be moved to a separate module if needed
@@ -198,7 +243,8 @@ async def mcp_endpoint(
         tools_list = _get_mcp_tools_list()
         response = make_response({"tools": tools_list})
         logger.info(f"tools/list response: {len(tools_list)} tools")
-        return response
+        
+        return await send_response_via_sse_or_http(response)
     elif method == "tools/call":
         # Execute tool call
         tool_name = params.get("name")
@@ -208,51 +254,59 @@ async def mcp_endpoint(
         logger.info(f"Tool arguments: {json.dumps(arguments, indent=2)}")
         
         try:
+            tool_response = None
             if tool_name == "search_knowledge_base":
-                return handle_search_knowledge_base(mcp, arguments, make_response)
+                tool_response = handle_search_knowledge_base(mcp, arguments, make_response)
             elif tool_name == "create_support_ticket":
-                return handle_create_ticket(request, arguments, make_response)
+                tool_response = handle_create_ticket(request, arguments, make_response)
             elif tool_name == "get_customer_info":
-                return handle_get_customer(request, arguments, make_response)
+                tool_response = handle_get_customer(request, arguments, make_response)
             elif tool_name == "escalate_to_human":
-                return handle_escalate(request, arguments, make_response)
+                tool_response = handle_escalate(request, arguments, make_response)
             elif tool_name == "log_interaction":
-                return handle_log_interaction(request, arguments, make_response)
+                tool_response = handle_log_interaction(request, arguments, make_response)
             elif tool_name == "check_order_status":
-                return handle_check_order(request, arguments, make_response)
+                tool_response = handle_check_order(request, arguments, make_response)
             elif tool_name == "check_availability":
-                return handle_check_availability(request, arguments, make_response)
+                tool_response = handle_check_availability(request, arguments, make_response)
             elif tool_name == "get_user_bookings":
-                return handle_get_user_bookings(request, arguments, make_response)
+                tool_response = handle_get_user_bookings(request, arguments, make_response)
             elif tool_name == "book_appointment":
-                return handle_book_appointment(request, arguments, make_response)
+                tool_response = handle_book_appointment(request, arguments, make_response)
             elif tool_name == "modify_appointment":
-                return handle_modify_appointment(request, arguments, make_response)
+                tool_response = handle_modify_appointment(request, arguments, make_response)
             elif tool_name == "cancel_appointment":
-                return handle_cancel_appointment(request, arguments, make_response)
+                tool_response = handle_cancel_appointment(request, arguments, make_response)
             elif tool_name == "post_call_data":
-                return handle_post_call_data(request, arguments, make_response)
+                tool_response = handle_post_call_data(request, arguments, make_response)
             elif tool_name == "get_clients":
-                return handle_get_clients(request, arguments, make_response)
+                tool_response = handle_get_clients(request, arguments, make_response)
             elif tool_name == "add_clients":
-                return handle_add_clients(request, arguments, make_response)
+                tool_response = handle_add_clients(request, arguments, make_response)
             else:
                 logger.warning(f"Unknown tool requested: {tool_name}")
-                return make_response({
+                tool_response = make_response({
                     "code": -32601,
                     "message": f"Unknown tool: {tool_name}"
                 }, is_error=True)
+            
+            # Send response through SSE if available
+            if tool_response:
+                return await send_response_via_sse_or_http(tool_response)
+            return tool_response
         except Exception as e:
             logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
-            return make_response({
+            error_response = make_response({
                 "code": -32603,
                 "message": f"Internal error executing tool: {str(e)}"
             }, is_error=True)
+            return await send_response_via_sse_or_http(error_response)
     else:
-        return make_response({
+        error_response = make_response({
             "code": -32601,
             "message": f"Method not found: {method or 'unknown'}"
         }, is_error=True)
+        return await send_response_via_sse_or_http(error_response)
 
 
 def _get_mcp_tools_list() -> list:
