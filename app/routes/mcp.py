@@ -238,6 +238,12 @@ async def mcp_endpoint(
     
     logger.info(f"MCP method: {method}, request_id: {request_id}")
     
+    # Determine if this is a validation request BEFORE building response
+    # Dashboard validation sends initialize/tools/list and expects immediate HTTP response
+    # For validation requests, NEVER use SSE - always return HTTP response directly
+    is_validation_request = method in ["initialize", "tools/list"]
+    logger.info(f"Request type: {'VALIDATION' if is_validation_request else 'TOOL_CALL'}, method={method}")
+    
     # Build response wrapper
     def make_response(result: Dict[str, Any], is_error: bool = False) -> Dict[str, Any]:
         response = {"jsonrpc": "2.0"}
@@ -249,103 +255,52 @@ async def mcp_endpoint(
             response["result"] = result
         return response
     
-    # Try to send response through SSE if there's an active connection
-    # For SSE transport, responses should go through the SSE stream, not HTTP
-    user_agent = request.headers.get('user-agent', '')
-    
+    # Determine if we should use SSE or HTTP response
+    # For dashboard validation (initialize, tools/list), always return HTTP response
+    # For actual tool calls during agent conversations, prefer SSE if available
+    use_sse_for_response = False
     sse_connection = None
     connection_id = None
+    user_agent = request.headers.get('user-agent', '')
     
-    # Try multiple matching strategies
-    # For MCP with SSE transport, we MUST use SSE if any connection exists
-    # The dashboard expects all responses through SSE, not HTTP
-    
-    # 0. Match by connection ID header if provided (most reliable)
-    if connection_id_header and connection_id_header in _sse_connections:
-        connection_id = connection_id_header
-        conn_data = _sse_connections[connection_id]
-        if isinstance(conn_data, dict):
-            sse_connection = conn_data.get('queue')
-            logger.info(f"Found SSE connection {connection_id} by X-Connection-ID header")
-    
-    # 1. Match by IP (reliable for same-origin requests)
-    if not sse_connection and client_ip in _connection_by_ip:
-        connection_id = _connection_by_ip[client_ip]
-        conn_data = _sse_connections.get(connection_id)
-        if conn_data and isinstance(conn_data, dict):
-            sse_connection = conn_data.get('queue')
-            logger.info(f"Found SSE connection {connection_id} by IP {client_ip}")
-    
-    # 2. Match by User-Agent if IP match failed
-    if not sse_connection and user_agent and user_agent in _connection_by_user_agent:
-        connection_id = _connection_by_user_agent[user_agent]
-        conn_data = _sse_connections.get(connection_id)
-        if conn_data and isinstance(conn_data, dict):
-            sse_connection = conn_data.get('queue')
-            logger.info(f"Found SSE connection {connection_id} by User-Agent")
-    
-    # 3. Find most recent active connection (within last 60 seconds)
-    # This is critical - dashboard POST requests may come from different IPs
-    # but we should use the most recent SSE connection
-    if not sse_connection:
-        current_time = time.time()
-        most_recent = None
-        most_recent_time = 0
-        
-        for conn_id, conn_data in _sse_connections.items():
+    # CRITICAL: For validation requests, NEVER use SSE - always return HTTP response
+    # This is required for ElevenLabs dashboard connection testing
+    if not is_validation_request:
+        # For tool calls, try to find an active SSE connection
+        # Match by connection ID header if provided (most reliable)
+        if connection_id_header and connection_id_header in _sse_connections:
+            connection_id = connection_id_header
+            conn_data = _sse_connections[connection_id]
             if isinstance(conn_data, dict):
-                created_at = conn_data.get('created_at', 0)
-                # Prefer connections created within last 60 seconds
-                age = current_time - created_at
-                if age < 60 and created_at > most_recent_time:
-                    most_recent_time = created_at
-                    most_recent = (conn_id, conn_data)
+                sse_connection = conn_data.get('queue')
+                use_sse_for_response = True
+                logger.info(f"Found SSE connection {connection_id} by X-Connection-ID header")
         
-        if most_recent:
-            connection_id, conn_data = most_recent
-            sse_connection = conn_data.get('queue')
-            logger.info(f"Using most recent SSE connection {connection_id} (age: {current_time - most_recent_time:.1f}s)")
-    
-    # 4. Last resort: use ANY active connection if available
-    # This ensures we always use SSE when possible (critical for dashboard validation)
-    if not sse_connection and _sse_connections:
-        # Get the most recently created connection
-        current_time = time.time()
-        most_recent = None
-        most_recent_time = 0
-        for conn_id, conn_data in _sse_connections.items():
-            if isinstance(conn_data, dict):
+        # Match by IP (reliable for same-origin requests)
+        if not sse_connection and client_ip in _connection_by_ip:
+            connection_id = _connection_by_ip[client_ip]
+            conn_data = _sse_connections.get(connection_id)
+            if conn_data and isinstance(conn_data, dict):
+                # Only use if connection is recent (within 5 minutes)
                 created_at = conn_data.get('created_at', 0)
-                if created_at > most_recent_time:
-                    most_recent_time = created_at
-                    most_recent = (conn_id, conn_data)
-        
-        if most_recent:
-            connection_id, conn_data = most_recent
-            sse_connection = conn_data.get('queue')
-            logger.info(f"Using most recent available SSE connection {connection_id} (last resort)")
-    
-    if sse_connection:
-        logger.info(f"Using SSE connection {connection_id} for POST request from {client_ip}")
-    else:
-        logger.warning(f"[CRITICAL] No SSE connection found for POST request from {client_ip}")
-        logger.warning(f"         Active connections: {len(_sse_connections)}")
-        logger.warning(f"         Connection IDs: {list(_sse_connections.keys())}")
-        logger.warning(f"         This will cause dashboard validation to FAIL!")
+                age = time.time() - created_at
+                if age < 300:  # 5 minutes
+                    sse_connection = conn_data.get('queue')
+                    use_sse_for_response = True
+                    logger.info(f"Found SSE connection {connection_id} by IP {client_ip} (age: {age:.1f}s)")
     
     async def send_response_via_sse_or_http(response: Dict[str, Any]) -> Dict[str, Any]:
-        """Send response through SSE if available, otherwise return HTTP response.
+        """Send response through SSE if available and appropriate, otherwise return HTTP response.
         
-        For MCP with SSE transport, responses MUST go through SSE stream.
-        Only return HTTP response if absolutely no SSE connection exists.
+        For dashboard validation requests (initialize, tools/list), always return HTTP response.
+        For tool calls during agent conversations, use SSE if available.
         """
-        if sse_connection:
+        if use_sse_for_response and sse_connection:
             try:
                 # Put response in queue - it will be sent through SSE stream
                 await sse_connection.put(response)
                 logger.info(f"Queued response for SSE to {connection_id}: method={response.get('method', 'response')}, id={response.get('id', 'N/A')}")
                 
-                # For dashboard validation, we need to ensure the response is sent quickly
                 # Return minimal response - actual response goes through SSE
                 return {"status": "sent_via_sse", "connection_id": connection_id}
             except Exception as e:
@@ -353,10 +308,8 @@ async def mcp_endpoint(
                 # Fallback to HTTP if SSE queue fails
                 return response
         else:
-            logger.error(f"[CRITICAL] No SSE connection available for POST from {client_ip}")
-            logger.error(f"         Active connections: {len(_sse_connections)}")
-            logger.error(f"         Connection IDs: {list(_sse_connections.keys())[:5]}")
-            logger.error(f"         Returning HTTP response - dashboard validation will FAIL!")
+            # Return HTTP response directly (required for dashboard validation)
+            logger.info(f"Returning HTTP response for method={method}, use_sse={use_sse_for_response}, has_sse_conn={sse_connection is not None}")
             return response
     
     if method == "initialize":
