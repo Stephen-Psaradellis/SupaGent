@@ -59,6 +59,8 @@ def main():
     ap.add_argument("--k", type=int, default=4)
     args = ap.parse_args()
 
+    print("Evaluating...")
+
     items: List[EvalItem] = []
     
     # Use domain-specific eval questions if file not specified
