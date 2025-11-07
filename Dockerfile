@@ -43,8 +43,7 @@ COPY . .
 # Create data directories
 RUN mkdir -p /app/data/chroma /app/data/sessions
 
-# Expose port (Railway sets PORT env var)
-EXPOSE $PORT
+# Note: EXPOSE is not needed - Railway handles port binding automatically via PORT env var
 
 # Run the application with Doppler
 # Note: DOPPLER_TOKEN should be set as an environment variable in your deployment platform
