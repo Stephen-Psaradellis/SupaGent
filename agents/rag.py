@@ -1,5 +1,19 @@
 from typing import List, Dict, Any, Optional
-from langchain.prompts import PromptTemplate
+
+try:
+    from langchain_core.prompts import PromptTemplate
+except ImportError:
+    try:
+        from langchain.prompts import PromptTemplate
+    except ImportError:
+        # Fallback: create a simple template class if langchain not available
+        class PromptTemplate:
+            @staticmethod
+            def from_template(template: str):
+                class _Template:
+                    def format(self, **kwargs):
+                        return template.format(**kwargs)
+                return _Template()
 
 from memory.mcp_client import MCPClient
 
