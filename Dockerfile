@@ -26,8 +26,10 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    gnupg \
-    && curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh \
+    && curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh -o /tmp/doppler-install.sh \
+    && chmod +x /tmp/doppler-install.sh \
+    && /tmp/doppler-install.sh --yes \
+    && rm -f /tmp/doppler-install.sh \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
