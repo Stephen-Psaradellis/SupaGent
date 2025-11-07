@@ -210,38 +210,38 @@ async def mcp_endpoint(
         try:
             if tool_name == "search_knowledge_base":
                 return handle_search_knowledge_base(mcp, arguments, make_response)
-        elif tool_name == "create_support_ticket":
-            return handle_create_ticket(request, arguments, make_response)
-        elif tool_name == "get_customer_info":
-            return handle_get_customer(request, arguments, make_response)
-        elif tool_name == "escalate_to_human":
-            return handle_escalate(request, arguments, make_response)
-        elif tool_name == "log_interaction":
-            return handle_log_interaction(request, arguments, make_response)
-        elif tool_name == "check_order_status":
-            return handle_check_order(request, arguments, make_response)
-        elif tool_name == "check_availability":
-            return handle_check_availability(request, arguments, make_response)
-        elif tool_name == "get_user_bookings":
-            return handle_get_user_bookings(request, arguments, make_response)
-        elif tool_name == "book_appointment":
-            return handle_book_appointment(request, arguments, make_response)
-        elif tool_name == "modify_appointment":
-            return handle_modify_appointment(request, arguments, make_response)
-        elif tool_name == "cancel_appointment":
-            return handle_cancel_appointment(request, arguments, make_response)
-        elif tool_name == "post_call_data":
-            return handle_post_call_data(request, arguments, make_response)
-        elif tool_name == "get_clients":
-            return handle_get_clients(request, arguments, make_response)
-        elif tool_name == "add_clients":
-            return handle_add_clients(request, arguments, make_response)
-        else:
-            logger.warning(f"Unknown tool requested: {tool_name}")
-            return make_response({
-                "code": -32601,
-                "message": f"Unknown tool: {tool_name}"
-            }, is_error=True)
+            elif tool_name == "create_support_ticket":
+                return handle_create_ticket(request, arguments, make_response)
+            elif tool_name == "get_customer_info":
+                return handle_get_customer(request, arguments, make_response)
+            elif tool_name == "escalate_to_human":
+                return handle_escalate(request, arguments, make_response)
+            elif tool_name == "log_interaction":
+                return handle_log_interaction(request, arguments, make_response)
+            elif tool_name == "check_order_status":
+                return handle_check_order(request, arguments, make_response)
+            elif tool_name == "check_availability":
+                return handle_check_availability(request, arguments, make_response)
+            elif tool_name == "get_user_bookings":
+                return handle_get_user_bookings(request, arguments, make_response)
+            elif tool_name == "book_appointment":
+                return handle_book_appointment(request, arguments, make_response)
+            elif tool_name == "modify_appointment":
+                return handle_modify_appointment(request, arguments, make_response)
+            elif tool_name == "cancel_appointment":
+                return handle_cancel_appointment(request, arguments, make_response)
+            elif tool_name == "post_call_data":
+                return handle_post_call_data(request, arguments, make_response)
+            elif tool_name == "get_clients":
+                return handle_get_clients(request, arguments, make_response)
+            elif tool_name == "add_clients":
+                return handle_add_clients(request, arguments, make_response)
+            else:
+                logger.warning(f"Unknown tool requested: {tool_name}")
+                return make_response({
+                    "code": -32601,
+                    "message": f"Unknown tool: {tool_name}"
+                }, is_error=True)
         except Exception as e:
             logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
             return make_response({
