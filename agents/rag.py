@@ -33,6 +33,18 @@ Answer:
 
 
 def format_context(docs: List[Dict[str, Any]]) -> str:
+    """Format retrieved documents into a context string.
+    
+    Converts a list of document dictionaries into a formatted string
+    suitable for inclusion in a prompt. Each document is prefixed with
+    its title/source and truncated to 500 characters.
+    
+    Args:
+        docs: List of document dictionaries with "page_content" and "metadata" keys.
+        
+    Returns:
+        Formatted context string with one document per line.
+    """
     lines = []
     for d in docs:
         meta = d.get("metadata", {})
@@ -42,6 +54,21 @@ def format_context(docs: List[Dict[str, Any]]) -> str:
 
 
 def _inline_citations(question: str, docs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Generate an answer with inline citations from retrieved documents.
+    
+    Uses a simple extractive approach: selects up to 3 sentences from the
+    retrieved documents that match keywords from the question. Attaches
+    citation markers [1], [2], etc. based on document titles.
+    
+    Args:
+        question: The user's question.
+        docs: List of retrieved document dictionaries.
+        
+    Returns:
+        Dictionary with:
+            - "text": Answer text with inline citation markers
+            - "citations": List of citation metadata with index and title
+    """
     # Simple extractive approach: pick up to 3 sentences that match keywords
     q_terms = {t.lower() for t in question.split() if len(t) > 3}
     selected: List[str] = []
@@ -90,23 +117,60 @@ def _inline_citations(question: str, docs: List[Dict[str, Any]]) -> Dict[str, An
 
 
 class RAGAnswerer:
+    """Retrieval-Augmented Generation answerer for customer support queries.
+    
+    Uses MCP client to retrieve relevant documents from the knowledge base,
+    then synthesizes answers with inline citations. Supports conversation
+    history for context-aware responses.
+    """
+    
     def __init__(self, mcp: MCPClient, prompt_template: str = DEFAULT_TEMPLATE, synthesizer: Optional[callable] = None):
+        """Initialize the RAG answerer.
+        
+        Args:
+            mcp: MCPClient instance for retrieving documents from vector store.
+            prompt_template: Optional prompt template string. Uses DEFAULT_TEMPLATE if not provided.
+            synthesizer: Optional custom synthesis function. Uses simple extractive
+                approach by default.
+        """
         self.mcp = mcp
         self.prompt = PromptTemplate.from_template(prompt_template)
         self._synth = synthesizer or self._simple_synthesis
 
     def answer(self, question: str, k: int = 4, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
-        # Optionally expand the query using recent user messages
+        """Generate an answer to a question using RAG.
+        
+        Retrieves relevant documents, augments the query with conversation
+        history if provided, and generates an answer with inline citations.
+        
+        Args:
+            question: The user's question.
+            k: Number of documents to retrieve (default: 4).
+            history: Optional conversation history in format
+                [{"role": "user"|"assistant", "text": str}].
+                
+        Returns:
+            Dictionary containing:
+                - "answer": Formatted answer text with citations
+                - "sources": List of source document metadata
+        """
+        # Augment query with recent conversation history for better context
         q_aug = question
         if history:
+            # Extract last 2 user messages for context
             recent_user = [t["text"] for t in history if t.get("role") == "user"][-2:]
             if recent_user:
                 q_aug = question + " \n\nRelated: " + " | ".join(recent_user)
+        
+        # Retrieve relevant documents from knowledge base via MCP
         retrieved = self.mcp.retrieve(q_aug, k=k)
-        # Compose a deterministic, concise answer with inline citations
+        
+        # Generate answer with inline citations using extractive approach
         extract = _inline_citations(question, retrieved)
         context = format_context(retrieved)
-        # Keep the "Answer:" prefix for tests and readability; include question for clarity
+        
+        # Format final answer with question, answer text, and citation list
+        # This format is used for tests and readability
         synthesized = (
             f"Question: {question}\n\n"
             f"Answer:\n{extract['text']}\n\nCitations:\n"
@@ -119,6 +183,17 @@ class RAGAnswerer:
 
     @staticmethod
     def _simple_synthesis(prompt_text: str) -> str:
+        """Simple synthesis fallback (legacy, currently unused).
+        
+        Legacy method kept for compatibility. The current answer() method
+        uses _inline_citations instead.
+        
+        Args:
+            prompt_text: Prompt text to synthesize.
+            
+        Returns:
+            Last 6 non-empty lines of the prompt.
+        """
         # Legacy fallback (unused in current answer()) kept for compatibility
         lines = [l for l in prompt_text.splitlines() if l.strip()]
         return "\n".join(lines[-6:])

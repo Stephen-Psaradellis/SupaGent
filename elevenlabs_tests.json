@@ -1,0 +1,172 @@
+{
+  "name": "SupaGent Comprehensive Test Suite",
+  "description": "Comprehensive test suite with 10 scenarios covering password reset, account recovery, support queries, and more.",
+  "scenarios": [
+    {
+      "name": "Password Reset Query",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I reset my password?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "password",
+        "reset"
+      ]
+    },
+    {
+      "name": "Account Recovery",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I forgot my email address, how can I recover my account?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "account",
+        "recover"
+      ]
+    },
+    {
+      "name": "Multi-turn Conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I reset my password?"
+        },
+        {
+          "role": "assistant",
+          "content": "You can reset your password by going to Settings."
+        },
+        {
+          "role": "user",
+          "content": "What if I don't have access to my email?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "email"
+      ]
+    },
+    {
+      "name": "General Support Question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I contact customer support?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "support",
+        "contact"
+      ]
+    },
+    {
+      "name": "Product Feature Query",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What features are available in your product?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "feature"
+      ]
+    },
+    {
+      "name": "Troubleshooting Query",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I'm having trouble logging in, what should I do?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "login",
+        "trouble"
+      ]
+    },
+    {
+      "name": "Policy Question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is your refund policy?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "refund",
+        "policy"
+      ]
+    },
+    {
+      "name": "Account Management",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How can I update my account information?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "account",
+        "update"
+      ]
+    },
+    {
+      "name": "Payment Question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What payment methods do you accept?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "payment",
+        "method"
+      ]
+    },
+    {
+      "name": "Subscription Query",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I upgrade my subscription?"
+        }
+      ],
+      "expected_tool_calls": [
+        "search_knowledge_base"
+      ],
+      "expected_keywords": [
+        "subscription",
+        "upgrade"
+      ]
+    }
+  ]
+}

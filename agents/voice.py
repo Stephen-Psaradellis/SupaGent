@@ -9,8 +9,20 @@ from memory.mcp_client import MCPClient
 
 
 class TTSEngine(Protocol):
+    """Protocol for Text-to-Speech engines.
+    
+    Defines the interface that TTS implementations must follow.
+    """
+    
     def synth(self, text: str) -> bytes:
-        """Synthesize speech for the given text and return audio bytes (mp3)."""
+        """Synthesize speech for the given text and return audio bytes (mp3).
+        
+        Args:
+            text: Text to synthesize into speech.
+            
+        Returns:
+            Audio bytes in MP3 format.
+        """
         ...
 
 
@@ -19,15 +31,32 @@ class ElevenLabsTTS:
 
     This is optional. If the SDK isn't installed or the API key is missing,
     calling synth() will raise a clear RuntimeError.
+    
+    Attributes:
+        CHUNK_BYTES: Default chunk size for streaming audio (32KB).
     """
 
     CHUNK_BYTES = 32_768
 
     def __init__(self, voice_id: Optional[str] = None):
+        """Initialize ElevenLabs TTS client.
+        
+        Args:
+            voice_id: Optional voice ID. If not provided, uses ELEVENLABS_VOICE_ID
+                environment variable or default voice.
+                
+        Raises:
+            RuntimeError: If elevenlabs SDK is not installed or API key is missing.
+        """
         self.voice_id = voice_id or os.getenv("ELEVENLABS_VOICE_ID", "")
         self._init_sdk()
 
     def _init_sdk(self) -> None:
+        """Initialize the ElevenLabs SDK client.
+        
+        Raises:
+            RuntimeError: If SDK is not installed or API key is missing.
+        """
         try:
             from elevenlabs import set_api_key  # type: ignore
             from elevenlabs.client import ElevenLabs  # type: ignore
@@ -43,6 +72,14 @@ class ElevenLabsTTS:
         self._client = ElevenLabs(api_key=api_key)
 
     def synth(self, text: str) -> bytes:
+        """Synthesize speech from text and return complete audio bytes.
+        
+        Args:
+            text: Text to convert to speech.
+            
+        Returns:
+            Complete MP3 audio bytes.
+        """
         voice_id = self.voice_id or ""  # allow default
         # Use the TTS endpoint to synthesize MP3 bytes
         audio = self._client.text_to_speech.convert(
@@ -58,6 +95,17 @@ class ElevenLabsTTS:
         return b"".join(chunks)
 
     def stream(self, text: str):
+        """Stream synthesized audio in chunks.
+        
+        Yields audio chunks as they become available, enabling real-time
+        playback without waiting for complete synthesis.
+        
+        Args:
+            text: Text to convert to speech.
+            
+        Yields:
+            Audio byte chunks in MP3 format.
+        """
         # Prefer a streamed SDK method if available; fall back to chunking synthesized bytes
         try:
             audio = self._client.text_to_speech.convert(
@@ -78,13 +126,39 @@ class ElevenLabsTTS:
 
 
 class VoiceAgent:
-    """Voice agent that uses RAG for answers and a TTS engine for audio."""
+    """Voice agent that uses RAG for answers and a TTS engine for audio.
+    
+    Combines RAG-based answer generation with text-to-speech synthesis
+    to provide voice-enabled customer support responses.
+    """
 
     def __init__(self, rag: RAGAnswerer, tts: Optional[TTSEngine] = None):
+        """Initialize the voice agent.
+        
+        Args:
+            rag: RAGAnswerer instance for generating text answers.
+            tts: Optional TTS engine for audio synthesis. If None, returns
+                text-only responses without audio.
+        """
         self._rag = rag
         self._tts = tts
 
     def answer(self, question: str) -> Dict[str, Any]:
+        """Generate a voice answer to a question.
+        
+        Uses RAG to generate a text answer, then synthesizes it to audio
+        if TTS is available. Returns both text and base64-encoded audio.
+        
+        Args:
+            question: The user's question.
+            
+        Returns:
+            Dictionary containing:
+                - "answer": Text answer from RAG
+                - "sources": Source document metadata
+                - "audio_base64": Base64-encoded MP3 audio (if TTS available)
+                - "warnings": List of warnings (e.g., if TTS failed)
+        """
         result = self._rag.answer(question)
         answer_text = result.get("answer", "")
         audio_b64: Optional[str] = None
@@ -99,13 +173,28 @@ class VoiceAgent:
         return result
 
     def stream_answer(self, question: str):
+        """Stream audio answer in real-time.
+        
+        Generates answer using RAG and streams audio chunks as they become
+        available, enabling low-latency voice responses.
+        
+        Args:
+            question: The user's question.
+            
+        Yields:
+            Audio byte chunks in MP3 format.
+            
+        Returns:
+            Empty iterator if TTS is not available or answer is empty.
+        """
         result = self._rag.answer(question)
         answer_text = result.get("answer", "")
-        # Prepend a tiny silent mp3 frame? For simplicity, stream TTS/bytes if available
+        
+        # Return empty iterator if TTS unavailable or no answer text
         if self._tts is None or not answer_text:
-            # If no TTS, stream nothing (caller should handle 400)
             return iter(())
-        # If TTS has a stream method use it; else chunk synth bytes
+        
+        # Use TTS stream method if available, otherwise chunk synthesized bytes
         stream_fn = getattr(self._tts, "stream", None)
         if callable(stream_fn):
             return stream_fn(answer_text)
