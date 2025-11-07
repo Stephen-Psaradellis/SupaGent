@@ -10,12 +10,18 @@ Railway provides a public URL that the ElevenLabs Agent can access. This guide w
 2. Click "New Project" → "Deploy from GitHub repo" (or use Railway CLI)
 3. Select your SupaGent repository
 
-### 2. Configure Environment Variables
+### 2. Configure Secrets and Environment Variables
 
-In Railway's dashboard, add these environment variables:
+**Secrets (Doppler):**
+1. Create a Doppler service token:
+   ```bash
+   doppler service-tokens create railway-prod --project <your-project> --config <your-config>
+   ```
 
-**Required:**
-- `ELEVENLABS_API_KEY` - Your ElevenLabs API key
+2. In Railway's dashboard, add this environment variable:
+   - `DOPPLER_TOKEN` - Your Doppler service token
+
+**Configuration (Railway Environment Variables):**
 - `ELEVENLABS_AGENT_ID` - Your agent ID (will be auto-created if not set)
 
 **Optional (Auto-configured on Railway):**
@@ -38,10 +44,10 @@ Railway will:
 2. Install dependencies from `requirements.txt`
 3. Run the app using the `Procfile` start command
 
-**Start Command (already in `Procfile`):**
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
+**Start Command:**
+The Dockerfile automatically uses `doppler run` to inject secrets. The app will:
+- Load secrets (`ELEVENLABS_API_KEY`, `OPENAI_API_KEY`) from Doppler
+- Load configuration from Railway environment variables
 
 Railway sets the `PORT` environment variable automatically. The app will:
 - Auto-detect Railway environment and use `/app/data/chroma` for vector store
@@ -208,7 +214,7 @@ These would require modifying the `VectorStore` class to use their APIs.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ELEVENLABS_API_KEY` | Yes | - | Your ElevenLabs API key |
+| `DOPPLER_TOKEN` | Yes | - | Doppler service token (for secrets) |
 | `ELEVENLABS_AGENT_ID` | No | - | Auto-created if not set |
 | `SUPAGENT_BASE_URL` | No | Auto-detected | Public URL (Railway auto-sets) |
 | `CHROMA_PERSIST_DIR` | No | `/app/data/chroma` | Vector store directory |

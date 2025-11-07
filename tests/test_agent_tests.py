@@ -39,8 +39,13 @@ def test_test_scenario_creation():
 def test_agent_tester_initialization():
     """Test that agent tester can be initialized."""
     import os
-    if not os.getenv("ELEVENLABS_API_KEY") or not os.getenv("ELEVENLABS_AGENT_ID"):
-        pytest.skip("ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID required")
+    from core.secrets import get_elevenlabs_api_key
+    from dotenv import load_dotenv
+    
+    load_dotenv()  # Load .env for ELEVENLABS_AGENT_ID
+    
+    if not get_elevenlabs_api_key() or not os.getenv("ELEVENLABS_AGENT_ID"):
+        pytest.skip("ELEVENLABS_API_KEY (from Doppler) and ELEVENLABS_AGENT_ID required")
     
     tester = ElevenLabsAgentTester()
     assert tester.agent_id is not None

@@ -27,5 +27,8 @@ beautifulsoup4>=4.12.0
 # Voice/Agent
 elevenlabs>=0.2.0
 
+# AI Generation
+openai>=1.0.0
+
 # Development only (not needed in production)
 # pytest>=7.4.0

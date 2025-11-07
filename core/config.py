@@ -1,8 +1,9 @@
 """
 Centralized configuration management for SupaGent.
 
-Provides a single source of truth for all configuration values,
-with environment variable support and sensible defaults.
+Provides a single source of truth for all configuration values.
+Secrets (API keys) are loaded from Doppler, while other configuration
+is loaded from .env file via dotenv.
 """
 from __future__ import annotations
 
@@ -12,8 +13,9 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
+from core.secrets import get_elevenlabs_api_key, get_openai_api_key
 
-# Load environment variables from .env file
+# Load environment variables from .env file (non-secrets only)
 load_dotenv()
 
 
@@ -85,8 +87,8 @@ class AppConfig:
             base_url = os.getenv("SUPAGENT_BASE_URL", "http://localhost:8000")
         
         return cls(
-            # ElevenLabs
-            elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
+            # ElevenLabs - API key from Doppler, others from .env
+            elevenlabs_api_key=get_elevenlabs_api_key(),
             elevenlabs_agent_id=os.getenv("ELEVENLABS_AGENT_ID"),
             elevenlabs_voice_id=os.getenv("ELEVENLABS_VOICE_ID"),
             elevenlabs_mcp_server_id=os.getenv("ELEVENLABS_MCP_SERVER_ID"),
@@ -122,6 +124,7 @@ class AppConfig:
         Returns:
             True if RAILWAY_ENVIRONMENT is set, False otherwise.
         """
+        # RAILWAY_ENVIRONMENT is a non-secret env var, safe to read directly
         return bool(os.getenv("RAILWAY_ENVIRONMENT"))
     
     def get_mcp_endpoint(self) -> str:

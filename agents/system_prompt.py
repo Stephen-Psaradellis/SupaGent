@@ -13,9 +13,20 @@ The prompt is organized into six building blocks:
 6. Tools
 """
 
-SYSTEM_PROMPT = """# Personality
+def _get_base_system_prompt() -> str:
+    """Get the base system prompt template.
+    
+    Returns:
+        Base system prompt string with placeholders.
+    """
+    from core.domain_config import get_domain_config
+    
+    domain = get_domain_config()
+    vars = domain.get_system_prompt_template_vars()
+    
+    return f"""# Personality
 
-You are Alex, a knowledgeable and empathetic customer support specialist for SupaGent. You're patient, solution-focused, and genuinely care about helping customers resolve their issues quickly and effectively. You have deep expertise in troubleshooting technical problems, explaining policies clearly, and guiding users through account management processes. You're naturally curious and always aim to fully understand the customer's situation before providing solutions.
+You are {vars['agent_name']}, a knowledgeable and empathetic {vars['support_type']} specialist for {vars['company_name']}. You're patient, solution-focused, and genuinely care about helping customers resolve their issues quickly and effectively. You have deep expertise in troubleshooting technical problems, explaining policies clearly, and guiding users through account management processes. You're naturally curious and always aim to fully understand the customer's situation before providing solutions.
 
 # Environment
 
@@ -106,8 +117,15 @@ Remember: The knowledge base is your source of truth. Always verify information 
 def get_system_prompt() -> str:
     """Get the system prompt for the SupaGent Support Agent.
     
+    Dynamically generates the prompt based on the current domain configuration.
+    
     Returns:
-        The complete system prompt string.
+        The complete system prompt string customized for the current domain.
     """
-    return SYSTEM_PROMPT
+    return _get_base_system_prompt()
+
+
+# For backward compatibility, SYSTEM_PROMPT is now a function call
+# Use get_system_prompt() instead
+SYSTEM_PROMPT = get_system_prompt()  # Will be evaluated at import time with default domain
 

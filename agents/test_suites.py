@@ -1,19 +1,45 @@
 """
 Pre-defined test suites for the agent.
 These test suites are designed to pass with the current implementation.
+Test suites are now domain-aware and will use domain-specific scenarios.
 """
 from agents.agent_testing import TestScenario
 
 
 def get_comprehensive_test_suite() -> list[TestScenario]:
-    """Get a comprehensive test suite with 10 tests that should pass.
+    """Get a comprehensive test suite with domain-specific tests.
     
-    Returns a curated set of test scenarios covering common customer support
-    use cases including password reset, account recovery, troubleshooting,
-    policy questions, and general support queries.
+    Returns test scenarios from the current domain configuration, or falls back
+    to generic scenarios if domain config doesn't have test scenarios defined.
     
     Returns:
-        List of 10 TestScenario objects ready for use with ElevenLabsAgentTester.
+        List of TestScenario objects ready for use with ElevenLabsAgentTester.
+    """
+    from core.domain_config import get_domain_config
+    
+    domain = get_domain_config()
+    
+    # Use domain-specific test scenarios if available
+    if domain.test_scenarios:
+        scenarios = []
+        for scenario_data in domain.test_scenarios:
+            scenarios.append(TestScenario(
+                name=scenario_data.get("name", "Unnamed Test"),
+                messages=scenario_data.get("messages", []),
+                expected_tool_calls=scenario_data.get("expected_tool_calls"),
+                expected_keywords=scenario_data.get("expected_keywords"),
+            ))
+        return scenarios
+    
+    # Fallback to generic test suite
+    return _get_generic_test_suite()
+
+
+def _get_generic_test_suite() -> list[TestScenario]:
+    """Get a generic test suite (fallback when domain config doesn't have scenarios).
+    
+    Returns:
+        List of generic TestScenario objects.
     """
     return [
         # Test 1: Basic password reset query
@@ -123,6 +149,38 @@ def get_comprehensive_test_suite() -> list[TestScenario]:
 def get_tool_invocation_test_suite() -> list[TestScenario]:
     """Get a test suite focused on tool invocation testing.
     
+    Returns test scenarios from the current domain configuration that focus on
+    tool invocation, or falls back to generic tool invocation tests.
+    
+    Returns:
+        List of TestScenario objects focused on tool invocation verification.
+    """
+    from core.domain_config import get_domain_config
+    
+    domain = get_domain_config()
+    
+    # Use domain-specific test scenarios if available, filter for tool invocation tests
+    if domain.test_scenarios:
+        scenarios = []
+        for scenario_data in domain.test_scenarios:
+            # Include scenarios that have expected_tool_calls
+            if scenario_data.get("expected_tool_calls"):
+                scenarios.append(TestScenario(
+                    name=scenario_data.get("name", "Unnamed Test"),
+                    messages=scenario_data.get("messages", []),
+                    expected_tool_calls=scenario_data.get("expected_tool_calls"),
+                    expected_keywords=[],  # Tool invocation tests don't check keywords
+                ))
+        if scenarios:
+            return scenarios
+    
+    # Fallback to generic tool invocation tests
+    return _get_generic_tool_invocation_test_suite()
+
+
+def _get_generic_tool_invocation_test_suite() -> list[TestScenario]:
+    """Get generic tool invocation test suite (fallback).
+    
     Returns 5 test scenarios specifically designed to verify that the knowledge base
     tool is correctly invoked by the agent. These tests use tool_call_parameters to verify
     actual tool invocation, not just message content.
@@ -188,6 +246,35 @@ def get_tool_invocation_test_suite() -> list[TestScenario]:
 
 def get_focused_test_suite() -> list[TestScenario]:
     """Get a focused test suite with high-confidence passing tests.
+    
+    Returns a smaller set of simple, high-confidence test scenarios from the
+    current domain configuration, or falls back to generic focused tests.
+    
+    Returns:
+        List of TestScenario objects with simple queries.
+    """
+    from core.domain_config import get_domain_config
+    
+    domain = get_domain_config()
+    
+    # Use first 5 domain-specific test scenarios if available
+    if domain.test_scenarios:
+        scenarios = []
+        for scenario_data in domain.test_scenarios[:5]:  # Take first 5
+            scenarios.append(TestScenario(
+                name=scenario_data.get("name", "Unnamed Test"),
+                messages=scenario_data.get("messages", []),
+                expected_tool_calls=scenario_data.get("expected_tool_calls"),
+                expected_keywords=scenario_data.get("expected_keywords", []),
+            ))
+        return scenarios
+    
+    # Fallback to generic focused tests
+    return _get_generic_focused_test_suite()
+
+
+def _get_generic_focused_test_suite() -> list[TestScenario]:
+    """Get generic focused test suite (fallback).
     
     Returns a smaller set of simple, high-confidence test scenarios that
     are most likely to pass. Useful for quick validation or smoke tests.

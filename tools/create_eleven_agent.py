@@ -31,9 +31,11 @@ def main():
     except Exception as e:
         raise SystemExit("elevenlabs SDK not installed. Run: pip install elevenlabs")
 
-    api_key = os.getenv("ELEVENLABS_API_KEY")
+    from core.secrets import get_elevenlabs_api_key
+    
+    api_key = get_elevenlabs_api_key()
     if not api_key:
-        raise SystemExit("ELEVENLABS_API_KEY not set.")
+        raise SystemExit("ELEVENLABS_API_KEY not set in Doppler.")
 
     client = ElevenLabs(api_key=api_key)
 

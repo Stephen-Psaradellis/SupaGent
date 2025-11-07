@@ -1,4 +1,5 @@
 import json
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,19 +52,46 @@ def run_eval(items: List[EvalItem], k: int = 4) -> Dict[str, Any]:
 
 def main():
     import argparse
+    from core.domain_config import get_domain_config
+    
     ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="dataset/eval.jsonl")
+    ap.add_argument("--file", default=None, help="Path to eval.jsonl file (defaults to domain-specific eval file)")
     ap.add_argument("--k", type=int, default=4)
     args = ap.parse_args()
 
     items: List[EvalItem] = []
-    p = Path(args.file)
-    if p.exists():
-        for line in p.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            obj = json.loads(line)
-            items.append(EvalItem(**obj))
+    
+    # Use domain-specific eval questions if file not specified
+    if args.file is None:
+        domain = get_domain_config()
+        if domain.eval_questions:
+            # Use domain-specific evaluation questions
+            for q in domain.eval_questions:
+                items.append(EvalItem(
+                    question=q.get("question", ""),
+                    expected_substring=q.get("expected_substring", ""),
+                ))
+        else:
+            # Fallback to default eval file
+            args.file = "dataset/eval.jsonl"
+    
+    # Load from file if specified or if domain doesn't have eval questions
+    if args.file:
+        p = Path(args.file)
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                obj = json.loads(line)
+                items.append(EvalItem(**obj))
+        elif not items:
+            print(f"Warning: Eval file not found: {args.file}", file=sys.stderr)
+            sys.exit(1)
+    
+    if not items:
+        print("Error: No evaluation items found. Check domain config or eval file.", file=sys.stderr)
+        sys.exit(1)
+    
     res = run_eval(items, k=args.k)
     print(json.dumps(res, indent=2))
 

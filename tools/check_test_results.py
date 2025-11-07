@@ -22,13 +22,15 @@ from agents.agent_testing import ElevenLabsAgentTester
 
 def check_test_results(suite_id: str = None):
     """Check and display test results."""
-    load_dotenv()
+    from core.secrets import get_elevenlabs_api_key
+    
+    load_dotenv()  # Load .env for ELEVENLABS_AGENT_ID
     
     agent_id = os.getenv("ELEVENLABS_AGENT_ID")
-    api_key = os.getenv("ELEVENLABS_API_KEY")
+    api_key = get_elevenlabs_api_key()
     
     if not agent_id or not api_key:
-        print("Error: ELEVENLABS_AGENT_ID and ELEVENLABS_API_KEY must be set")
+        print("Error: ELEVENLABS_AGENT_ID and ELEVENLABS_API_KEY (from Doppler) must be set")
         return
     
     tester = ElevenLabsAgentTester()

@@ -1,0 +1,180 @@
+{
+  "domain_id": "mcdonalds",
+  "company_name": "McDonald's",
+  "product_name": "McDonald's App",
+  "agent_name": "Alex",
+  "support_type": "customer service",
+  "industry": "restaurant",
+  "test_scenarios": [
+    {
+      "name": "App Login Issue",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I can't log into the McDonald's app"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "login",
+        "app"
+      ]
+    },
+    {
+      "name": "Order Status Inquiry",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I check my order status?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "order",
+        "status"
+      ]
+    },
+    {
+      "name": "Rewards Program Question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How does the rewards program work?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "rewards",
+        "points"
+      ]
+    },
+    {
+      "name": "Refund Request",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I request a refund?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "refund"
+      ]
+    },
+    {
+      "name": "Store Locator",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I find a nearby McDonald's location?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "location",
+        "store"
+      ]
+    },
+    {
+      "name": "Mobile Order Issue",
+      "messages": [
+        {
+          "role": "user",
+          "content": "My mobile order didn't go through"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "mobile order",
+        "order"
+      ]
+    },
+    {
+      "name": "Payment Method Question",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What payment methods do you accept?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "payment",
+        "method"
+      ]
+    },
+    {
+      "name": "Nutritional Information",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Where can I find nutritional information?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "nutrition",
+        "nutritional"
+      ]
+    }
+  ],
+  "eval_questions": [
+    {
+      "question": "How do I log into the McDonald's app?",
+      "expected_substring": "login"
+    },
+    {
+      "question": "How do I check my order status?",
+      "expected_substring": "order"
+    },
+    {
+      "question": "How does the rewards program work?",
+      "expected_substring": "rewards"
+    },
+    {
+      "question": "How do I request a refund?",
+      "expected_substring": "refund"
+    },
+    {
+      "question": "How do I find a nearby McDonald's?",
+      "expected_substring": "location"
+    },
+    {
+      "question": "What payment methods do you accept?",
+      "expected_substring": "payment"
+    },
+    {
+      "question": "Where can I find nutritional information?",
+      "expected_substring": "nutrition"
+    },
+    {
+      "question": "How do I redeem rewards points?",
+      "expected_substring": "redeem"
+    },
+    {
+      "question": "Can I modify my order after placing it?",
+      "expected_substring": "modify"
+    },
+    {
+      "question": "How do I contact customer service?",
+      "expected_substring": "contact"
+    }
+  ],
+  "prompt_customizations": {}
+}

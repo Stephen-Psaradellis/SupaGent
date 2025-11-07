@@ -18,11 +18,14 @@ pip install elevenlabs
 
 2) Environment
 
-Copy `.env.example` to `.env` and set:
-- ELEVENLABS_API_KEY={{ELEVENLABS_API_KEY}}
-- ELEVENLABS_AGENT_ID={{ELEVENLABS_AGENT_ID}} (preferred voice backend)
-- Optional (fallback TTS): ELEVENLABS_VOICE_ID={{VOICE_ID}}
-- Optional: CHROMA_PERSIST_DIR, EMBEDDING_MODEL
+**Secrets (API Keys):** Configure in Doppler:
+- `ELEVENLABS_API_KEY` - Your ElevenLabs API key
+- `OPENAI_API_KEY` - Your OpenAI API key (for domain generation)
+
+**Configuration:** Copy `.env.example` to `.env` and set:
+- `ELEVENLABS_AGENT_ID` - Your ElevenLabs agent ID (preferred voice backend)
+- Optional (fallback TTS): `ELEVENLABS_VOICE_ID`
+- Optional: `CHROMA_PERSIST_DIR`, `EMBEDDING_MODEL`, etc.
 
 3) Ingest docs
 
@@ -56,10 +59,60 @@ Visit http://localhost:8000/demo for the web UI.
 - `app/main.py`: FastAPI app, endpoints, and demo static server.
 - `tools/ingest.py`: dataset ingestion and chunking.
 
+## Domain Configuration
+
+The agent can be easily reconfigured for different companies/products. Pre-configured domains include GitLab and McDonald's.
+
+### Switching Domains
+
+```bash
+# Switch to McDonald's domain
+python -m tools.switch_domain mcdonalds
+
+# Switch and update ElevenLabs agent prompt
+python -m tools.switch_domain mcdonalds --update-agent
+
+# Switch, update agent, and regenerate tests
+python -m tools.switch_domain mcdonalds --update-agent --regenerate-tests
+
+# List available domains
+python -m tools.switch_domain --list
+```
+
+When you switch domains, the system automatically:
+- Updates the system prompt with domain-specific information
+- Regenerates evaluation questions
+- Optionally updates the ElevenLabs agent prompt
+- Optionally regenerates test suites in ElevenLabs
+
+### Generating New Domains with OpenAI
+
+You can automatically generate domain configurations using OpenAI:
+
+```bash
+# Set your OpenAI API key in Doppler
+doppler secrets set OPENAI_API_KEY=your_api_key_here
+
+# Generate a new domain
+python -m tools.switch_domain mycompany --generate \
+  --company "My Company" \
+  --product "My Product" \
+  --industry "technology"
+```
+
+This will automatically generate test scenarios and evaluation questions tailored to your domain.
+
+See `domains/README.md` for details on creating custom domain configurations.
+
 ## Deployment
 
-- Environment variables
-  - ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, optional ELEVENLABS_VOICE_ID
+- **Secrets (Doppler):**
+  - `ELEVENLABS_API_KEY` - Required for voice features
+  - `OPENAI_API_KEY` - Required for domain generation
+- **Configuration (.env file):**
+  - `ELEVENLABS_AGENT_ID` - ElevenLabs agent ID
+  - `ELEVENLABS_VOICE_ID` - Optional voice ID
+  - `DOMAIN_ID` - Optional, defaults to "gitlab"
   - VECTOR_BACKEND: CHROMA (default) or FAISS
   - CHROMA_PERSIST_DIR: path for Chroma/FAISS persistence
   - EMBEDDING_MODEL: HF model name
