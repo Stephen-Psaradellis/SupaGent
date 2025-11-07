@@ -29,6 +29,20 @@ from app.routes.mcp_handlers import (
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
+@router.options("")
+async def mcp_endpoint_options() -> Response:
+    """Handle CORS preflight requests for MCP endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+
 @router.get("")
 async def mcp_endpoint_get(
     request: Request,
@@ -37,20 +51,30 @@ async def mcp_endpoint_get(
     """MCP protocol endpoint for SSE (Server-Sent Events) transport.
     
     ElevenLabs uses SSE transport which requires a GET request to establish
-    the connection. This endpoint handles the SSE handshake and streams responses.
+    the connection. This endpoint handles the SSE handshake and responds to
+    MCP protocol messages.
     """
-    # For SSE, we need to return a streaming response
-    # The client will send messages via the SSE connection
+    # Check if this is an initialize request (common in MCP SSE)
+    # The client may send the initialize request as a query parameter or header
+    initialize_request = request.query_params.get("message")
+    
     async def event_stream():
-        # Send initial connection message
-        yield f"data: {json.dumps({'type': 'connection', 'status': 'connected'})}\n\n"
+        # For MCP SSE, we typically wait for the client to send an initialize request
+        # But since we can't read from the stream easily, we'll send a ready signal
+        # and the client will send requests via POST which we handle separately
         
-        # Keep connection alive and handle incoming messages
-        # Note: In a real SSE implementation, you'd need to handle bidirectional communication
-        # For now, we'll just keep the connection open
+        # Send a simple connection established message
+        # Some MCP implementations send this, others don't
+        # We'll keep it minimal to avoid protocol issues
+        
+        # Keep connection alive - the actual MCP protocol messages
+        # will be handled via POST requests to the same endpoint
         import asyncio
+        
+        # Send periodic keepalives to maintain the SSE connection
+        # The client will send actual requests via POST
         while True:
-            await asyncio.sleep(30)  # Send keepalive every 30 seconds
+            await asyncio.sleep(10)  # Send keepalive every 10 seconds
             yield f": keepalive\n\n"
     
     return StreamingResponse(
@@ -60,6 +84,9 @@ async def mcp_endpoint_get(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
         }
     )
 
@@ -91,7 +118,19 @@ async def mcp_endpoint(
             response["result"] = result
         return response
     
-    if method == "tools/list" or method == "initialize":
+    if method == "initialize":
+        # Handle initialize request - return server capabilities
+        return make_response({
+            "protocolVersion": "2024-11-05",
+            "serverInfo": {
+                "name": "SupaGent Knowledge Base",
+                "version": "1.0.0"
+            },
+            "capabilities": {
+                "tools": {}
+            }
+        })
+    elif method == "tools/list":
         # Return available tools - this is a large list, kept here for now
         # Could be moved to a separate module if needed
         tools_list = _get_mcp_tools_list()
