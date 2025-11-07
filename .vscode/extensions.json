@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-toolsai.jupyter",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-json"
+  ],
+  "unwantedRecommendations": []
+}
+

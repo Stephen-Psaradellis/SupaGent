@@ -1,0 +1,200 @@
+{
+  // Color theme optimized for deuteranopia (red-green color blindness)
+  "workbench.colorTheme": "Default Dark+",
+  
+  // Customize colors for better deuteranopia accessibility
+  "workbench.colorCustomizations": {
+    "[Default Dark+]": {
+      "editor.background": "#1e1e1e",
+      "editor.foreground": "#d4d4d4",
+      "editorLineNumber.foreground": "#858585",
+      "editorLineNumber.activeForeground": "#c6c6c6",
+      "editor.selectionBackground": "#264f78",
+      "editor.selectionHighlightBackground": "#3a3d41",
+      "editorCursor.foreground": "#aeafad"
+    },
+    // Use blue/cyan instead of red/green for status indicators
+    "statusBar.errorBackground": "#0078d4",  // Blue instead of red
+    "statusBar.warningBackground": "#ffaa00", // Orange/amber instead of yellow
+    "statusBar.successBackground": "#00b294", // Teal/cyan instead of green
+    
+    // Editor colors - avoid red/green combinations
+    "editorError.foreground": "#4fc3f7",     // Light blue for errors
+    "editorWarning.foreground": "#ffb74d",   // Orange for warnings
+    "editorInfo.foreground": "#64b5f6",      // Blue for info
+    
+    // Git colors - use blue/cyan instead of red/green
+    "gitDecoration.modifiedResourceForeground": "#ffb74d",  // Orange
+    "gitDecoration.deletedResourceForeground": "#ef5350",    // Red (but distinct)
+    "gitDecoration.untrackedResourceForeground": "#42a5f5",  // Blue
+    "gitDecoration.ignoredResourceForeground": "#78909c",   // Gray
+    
+    // Terminal colors - deuteranopia-friendly palette
+    "terminal.ansiRed": "#ef5350",      // Keep red but make it distinct
+    "terminal.ansiGreen": "#66bb6a",    // Shift green to be more distinct
+    "terminal.ansiYellow": "#ffb74d",  // Orange-yellow
+    "terminal.ansiBlue": "#42a5f5",    // Blue
+    "terminal.ansiMagenta": "#ab47bc", // Magenta
+    "terminal.ansiCyan": "#26c6da",    // Cyan
+    "terminal.ansiWhite": "#eceff1",    // Light gray
+    
+    // Activity bar and side bar
+    "activityBarBadge.background": "#42a5f5",  // Blue instead of red
+    "badge.background": "#42a5f5",             // Blue for badges
+    
+    // List and tree views
+    "list.errorForeground": "#4fc3f7",         // Light blue
+    "list.warningForeground": "#ffb74d",       // Orange
+    "list.highlightForeground": "#64b5f6",     // Blue
+    
+    // Peek view colors
+    "peekView.border": "#42a5f5",           // Blue border
+    "peekViewEditor.background": "#1e1e1e",
+    "peekViewResult.background": "#1e1e1e",
+    "peekViewResult.selectionBackground": "#264f78",
+    
+    // Problems/decorations
+    "problems.errorIconForeground": "#4fc3f7",    // Light blue
+    "problems.warningIconForeground": "#ffb74d", // Orange
+    "problems.infoIconForeground": "#64b5f6",     // Blue
+    
+    // Diff editor colors - avoid red/green
+    "diffEditor.insertedTextBackground": "#264f78",  // Blue background
+    "diffEditor.removedTextBackground": "#5a1d1d",   // Dark red (but distinct)
+    "diffEditor.insertedLineBackground": "#264f78",
+    "diffEditor.removedLineBackground": "#5a1d1d"
+  },
+  
+  // Syntax highlighting - customize token colors
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": [
+          "keyword",
+          "storage.type",
+          "storage.modifier"
+        ],
+        "settings": {
+          "foreground": "#4fc3f7",  // Light blue for keywords
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": [
+          "string",
+          "string.quoted"
+        ],
+        "settings": {
+          "foreground": "#66bb6a"   // Green (but shifted to be more distinct)
+        }
+      },
+      {
+        "scope": [
+          "comment",
+          "punctuation.definition.comment"
+        ],
+        "settings": {
+          "foreground": "#78909c",  // Gray for comments
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "scope": [
+          "variable",
+          "variable.other"
+        ],
+        "settings": {
+          "foreground": "#eceff1"   // Light gray/white
+        }
+      },
+      {
+        "scope": [
+          "entity.name.function",
+          "support.function"
+        ],
+        "settings": {
+          "foreground": "#64b5f6"   // Blue for functions
+        }
+      },
+      {
+        "scope": [
+          "constant.numeric",
+          "constant.language"
+        ],
+        "settings": {
+          "foreground": "#ffb74d"   // Orange for constants
+        }
+      },
+      {
+        "scope": [
+          "entity.name.class",
+          "entity.name.type"
+        ],
+        "settings": {
+          "foreground": "#ab47bc"   // Magenta for classes/types
+        }
+      }
+    ]
+  },
+  
+  // UI settings for better visibility
+  "editor.fontSize": 14,
+  "editor.fontWeight": "400",
+  "editor.lineHeight": 1.6,
+  "editor.cursorWidth": 2,
+  "editor.cursorBlinking": "solid",
+  
+  // Bracket pair colorization - use distinct colors
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  
+  // Minimap settings
+  "editor.minimap.enabled": true,
+  "editor.minimap.maxColumn": 120,
+  
+  // Python-specific settings
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  
+  // JSON settings
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  
+  // Markdown settings
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    }
+  },
+  
+  // File associations
+  "files.associations": {
+    "*.md": "markdown"
+  },
+  
+  // Exclude patterns for better performance
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true
+  },
+  
+  // Search exclude patterns
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/data/chroma": true,
+    "**/.venv": true
+  }
+}
+
