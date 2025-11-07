@@ -4,11 +4,14 @@ MCP (Model Context Protocol) routes.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Dict
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import MCPDep
+
+logger = logging.getLogger(__name__)
 from app.routes.mcp_handlers import (
     handle_search_knowledge_base,
     handle_create_ticket,
@@ -30,8 +33,10 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
 @router.options("")
-async def mcp_endpoint_options() -> Response:
+async def mcp_endpoint_options(request: Request) -> Response:
     """Handle CORS preflight requests for MCP endpoint."""
+    logger.info(f"MCP OPTIONS request from {request.client.host if request.client else 'unknown'}")
+    logger.info(f"Headers: {dict(request.headers)}")
     return Response(
         status_code=200,
         headers={
@@ -54,28 +59,74 @@ async def mcp_endpoint_get(
     the connection. This endpoint handles the SSE handshake and responds to
     MCP protocol messages.
     """
+    # Log the incoming request for debugging
+    logger.info(f"MCP GET (SSE) request from {request.client.host if request.client else 'unknown'}")
+    logger.info(f"Query params: {dict(request.query_params)}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    
     # Check if this is an initialize request (common in MCP SSE)
     # The client may send the initialize request as a query parameter or header
     initialize_request = request.query_params.get("message")
+    if initialize_request:
+        logger.info(f"Initialize request in query: {initialize_request}")
     
     async def event_stream():
-        # For MCP SSE, we typically wait for the client to send an initialize request
-        # But since we can't read from the stream easily, we'll send a ready signal
-        # and the client will send requests via POST which we handle separately
+        logger.info("Starting SSE event stream")
         
-        # Send a simple connection established message
-        # Some MCP implementations send this, others don't
-        # We'll keep it minimal to avoid protocol issues
+        # For MCP with SSE transport, the protocol typically works like this:
+        # 1. Client connects via GET (this request)
+        # 2. Client sends initialize request (usually via POST, but could be in query params)
+        # 3. Server responds with initialize result
+        # 4. Client requests tools/list
+        # 5. Server responds with tools
         
-        # Keep connection alive - the actual MCP protocol messages
-        # will be handled via POST requests to the same endpoint
-        import asyncio
+        # Since we can't easily read from SSE stream in FastAPI, we handle requests via POST
+        # But we need to send an initial message to indicate the connection is ready
         
-        # Send periodic keepalives to maintain the SSE connection
-        # The client will send actual requests via POST
-        while True:
-            await asyncio.sleep(10)  # Send keepalive every 10 seconds
-            yield f": keepalive\n\n"
+        # Send initial connection message in MCP format
+        # Some implementations send this, others wait for initialize
+        # Let's try sending a minimal ready signal
+        try:
+            # Wait a brief moment to see if client sends initialize via query param
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            # If there's an initialize request in query params, respond to it
+            if initialize_request:
+                try:
+                    init_data = json.loads(initialize_request)
+                    if init_data.get("method") == "initialize":
+                        logger.info("Responding to initialize from query params")
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": init_data.get("id"),
+                            "result": {
+                                "protocolVersion": "2024-11-05",
+                                "serverInfo": {
+                                    "name": "SupaGent Knowledge Base",
+                                    "version": "1.0.0"
+                                },
+                                "capabilities": {
+                                    "tools": {}
+                                }
+                            }
+                        }
+                        yield f"data: {json.dumps(response)}\n\n"
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"Failed to parse initialize request: {e}")
+            
+            # Send periodic keepalives to maintain the SSE connection
+            # The actual MCP protocol messages will be handled via POST requests
+            keepalive_count = 0
+            while True:
+                await asyncio.sleep(10)  # Send keepalive every 10 seconds
+                keepalive_count += 1
+                if keepalive_count % 6 == 0:  # Log every minute
+                    logger.info(f"SSE connection alive, keepalive #{keepalive_count}")
+                yield f": keepalive\n\n"
+        except Exception as e:
+            logger.error(f"Error in SSE stream: {e}", exc_info=True)
+            raise
     
     return StreamingResponse(
         event_stream(),
@@ -102,10 +153,17 @@ async def mcp_endpoint(
     Implements the MCP protocol for tool discovery and execution.
     Supports both JSON-RPC format and direct method calls.
     """
+    # Log the incoming request for debugging
+    logger.info(f"MCP POST request from {request.client.host if request.client else 'unknown'}")
+    logger.info(f"Request body: {json.dumps(request_body, indent=2)}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    
     # Handle JSON-RPC format
     method = request_body.get("method") or request_body.get("jsonrpc_method")
     params = request_body.get("params", {})
     request_id = request_body.get("id")
+    
+    logger.info(f"MCP method: {method}, request_id: {request_id}")
     
     # Build response wrapper
     def make_response(result: Dict[str, Any], is_error: bool = False) -> Dict[str, Any]:
@@ -120,7 +178,8 @@ async def mcp_endpoint(
     
     if method == "initialize":
         # Handle initialize request - return server capabilities
-        return make_response({
+        logger.info("Handling initialize request")
+        response = make_response({
             "protocolVersion": "2024-11-05",
             "serverInfo": {
                 "name": "SupaGent Knowledge Base",
@@ -130,18 +189,27 @@ async def mcp_endpoint(
                 "tools": {}
             }
         })
+        logger.info(f"Initialize response: {json.dumps(response, indent=2)}")
+        return response
     elif method == "tools/list":
         # Return available tools - this is a large list, kept here for now
         # Could be moved to a separate module if needed
+        logger.info("Handling tools/list request")
         tools_list = _get_mcp_tools_list()
-        return make_response({"tools": tools_list})
+        response = make_response({"tools": tools_list})
+        logger.info(f"tools/list response: {len(tools_list)} tools")
+        return response
     elif method == "tools/call":
         # Execute tool call
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
         
-        if tool_name == "search_knowledge_base":
-            return handle_search_knowledge_base(mcp, arguments, make_response)
+        logger.info(f"Handling tools/call for tool: {tool_name}")
+        logger.info(f"Tool arguments: {json.dumps(arguments, indent=2)}")
+        
+        try:
+            if tool_name == "search_knowledge_base":
+                return handle_search_knowledge_base(mcp, arguments, make_response)
         elif tool_name == "create_support_ticket":
             return handle_create_ticket(request, arguments, make_response)
         elif tool_name == "get_customer_info":
@@ -169,9 +237,16 @@ async def mcp_endpoint(
         elif tool_name == "add_clients":
             return handle_add_clients(request, arguments, make_response)
         else:
+            logger.warning(f"Unknown tool requested: {tool_name}")
             return make_response({
                 "code": -32601,
                 "message": f"Unknown tool: {tool_name}"
+            }, is_error=True)
+        except Exception as e:
+            logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
+            return make_response({
+                "code": -32603,
+                "message": f"Internal error executing tool: {str(e)}"
             }, is_error=True)
     else:
         return make_response({

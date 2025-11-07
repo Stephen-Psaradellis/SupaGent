@@ -98,3 +98,29 @@ def resolve_knowledge_gap(
     }
 
 
+@router.get("/mcp/debug")
+def mcp_debug_info(
+    request: Request,
+) -> Dict[str, Any]:
+    """Get MCP server debugging information."""
+    config = request.app.state.config
+    mcp_server_id = config.elevenlabs_mcp_server_id or getattr(request.app.state, "_mcp_server_id", None)
+    mcp_error = getattr(request.app.state, "_mcp_server_error", None)
+    agent_error = getattr(request.app.state, "_agent_update_error", None)
+    
+    return {
+        "mcp_server": {
+            "id": mcp_server_id,
+            "endpoint": config.get_mcp_endpoint(),
+            "status": "configured" if mcp_server_id else "not_configured",
+            "error": mcp_error,
+        },
+        "agent": {
+            "id": config.elevenlabs_agent_id,
+            "update_error": agent_error,
+        },
+        "base_url": config.base_url,
+        "note": "Check application logs for detailed MCP request/response information"
+    }
+
+
