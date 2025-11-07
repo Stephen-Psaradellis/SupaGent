@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from core.domain_config import DomainConfig
@@ -42,6 +43,24 @@ class DomainGenerator:
         
         self.client = OpenAI(api_key=self.api_key)
         self.model = model
+    
+    def _load_elevenlabs_prompting_guide(self) -> str:
+        """Load the ElevenLabs prompting guide content.
+        
+        Returns:
+            The content of the ElevenLabs prompting guide as a string.
+        """
+        # Get the project root (assuming this file is in core/)
+        project_root = Path(__file__).parent.parent
+        guide_path = project_root / "docs" / "ELEVENLABS_PROMPTING_GUIDE.md"
+        
+        if not guide_path.exists():
+            raise FileNotFoundError(
+                f"ElevenLabs prompting guide not found at {guide_path}. "
+                "Please ensure docs/ELEVENLABS_PROMPTING_GUIDE.md exists."
+            )
+        
+        return guide_path.read_text(encoding="utf-8")
     
     def generate_test_scenarios(
         self,
@@ -208,6 +227,104 @@ Return ONLY valid JSON, no markdown formatting, no explanation."""
             
         except Exception as e:
             raise RuntimeError(f"Failed to generate evaluation questions: {e}") from e
+    
+    def generate_system_prompt(
+        self,
+        company_name: str,
+        product_name: str,
+        agent_name: str = "Alex",
+        support_type: str = "customer support",
+        industry: str = "general",
+    ) -> str:
+        """Generate a system prompt for a voice agent using OpenAI.
+        
+        This method generates a system prompt following the ElevenLabs Agent
+        Prompting Guide structure, ensuring the prompt is optimized for voice
+        interactions and follows best practices.
+        
+        Args:
+            company_name: Name of the company.
+            product_name: Name of the product/service.
+            agent_name: Name of the support agent (default: "Alex").
+            support_type: Type of support (default: "customer support").
+            industry: Industry sector (default: "general").
+            
+        Returns:
+            Generated system prompt string following the ElevenLabs guide structure.
+        """
+        # Load the ElevenLabs prompting guide as context
+        try:
+            prompting_guide = self._load_elevenlabs_prompting_guide()
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                f"Failed to load ElevenLabs prompting guide: {e}. "
+                "The guide is required to generate high-quality system prompts."
+            ) from e
+        
+        prompt = f"""Generate a comprehensive system prompt for an ElevenLabs voice agent that provides {support_type} for {company_name} ({product_name}).
+
+Company: {company_name}
+Product: {product_name}
+Agent Name: {agent_name}
+Support Type: {support_type}
+Industry: {industry}
+
+You must follow the ElevenLabs Agent Prompting Guide structure exactly. The prompt must be organized into these six building blocks:
+
+1. **Personality**: Define the agent's identity, name ({agent_name}), core traits, role, and relevant background
+2. **Environment**: Specify the communication context (voice conversation), channel, and situational factors
+3. **Tone**: Control linguistic style, speech patterns, conversational elements, and TTS compatibility (formatting for spoken delivery)
+4. **Goal**: Establish clear objectives and sequential pathways for helping customers
+5. **Guardrails**: Set boundaries ensuring appropriate and ethical interactions
+6. **Tools**: Define the knowledgebase tool and when/how to use it
+
+The prompt should be optimized for voice interactions, with clear instructions for:
+- Natural speech patterns and conversational elements
+- TTS-compatible formatting (spelling out emails, formatting phone numbers, converting numbers to spoken form)
+- Empathy and understanding customer frustration
+- Clear step-by-step guidance
+- Knowledge base tool usage
+
+Return ONLY the system prompt text, structured with clear section headers (using # for main sections). Do not include any explanation, markdown code blocks, or additional commentary - just the prompt itself.
+
+Reference the ElevenLabs Prompting Guide below for detailed guidance on each section:
+
+---
+{prompting_guide}
+---"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at creating system prompts for voice agents following the ElevenLabs Agent Prompting Guide. Generate prompts that are clear, structured, and optimized for voice interactions."
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+            )
+            
+            content = response.choices[0].message.content
+            
+            # Clean up the response - remove markdown code blocks if present
+            content = content.strip()
+            if content.startswith("```"):
+                # Remove markdown code block markers
+                lines = content.split("\n")
+                # Remove first line if it's a code block marker
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                # Remove last line if it's a code block marker
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                content = "\n".join(lines)
+            
+            return content.strip()
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to generate system prompt: {e}") from e
     
     def generate_domain_config(
         self,
