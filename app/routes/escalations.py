@@ -47,3 +47,4 @@ def update_escalation(
     success = escalations.update_escalation(session_id, updates)
     return {"success": success}
 
+

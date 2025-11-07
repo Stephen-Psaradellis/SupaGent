@@ -21,3 +21,4 @@ def query(
     """Process a text query using the conversation service."""
     return service.process_query(q.question, session_id=session_id, k=4)
 
+

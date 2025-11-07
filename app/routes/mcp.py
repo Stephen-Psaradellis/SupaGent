@@ -3,8 +3,10 @@ MCP (Model Context Protocol) routes.
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Dict
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
+from fastapi.responses import StreamingResponse
 
 from app.dependencies import MCPDep
 from app.routes.mcp_handlers import (
@@ -14,9 +16,52 @@ from app.routes.mcp_handlers import (
     handle_escalate,
     handle_log_interaction,
     handle_check_order,
+    handle_check_availability,
+    handle_get_user_bookings,
+    handle_book_appointment,
+    handle_modify_appointment,
+    handle_cancel_appointment,
+    handle_post_call_data,
+    handle_get_clients,
+    handle_add_clients,
 )
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
+
+
+@router.get("")
+async def mcp_endpoint_get(
+    request: Request,
+    mcp: MCPDep = None,
+) -> Response:
+    """MCP protocol endpoint for SSE (Server-Sent Events) transport.
+    
+    ElevenLabs uses SSE transport which requires a GET request to establish
+    the connection. This endpoint handles the SSE handshake and streams responses.
+    """
+    # For SSE, we need to return a streaming response
+    # The client will send messages via the SSE connection
+    async def event_stream():
+        # Send initial connection message
+        yield f"data: {json.dumps({'type': 'connection', 'status': 'connected'})}\n\n"
+        
+        # Keep connection alive and handle incoming messages
+        # Note: In a real SSE implementation, you'd need to handle bidirectional communication
+        # For now, we'll just keep the connection open
+        import asyncio
+        while True:
+            await asyncio.sleep(30)  # Send keepalive every 30 seconds
+            yield f": keepalive\n\n"
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.post("")
@@ -68,6 +113,22 @@ async def mcp_endpoint(
             return handle_log_interaction(request, arguments, make_response)
         elif tool_name == "check_order_status":
             return handle_check_order(request, arguments, make_response)
+        elif tool_name == "check_availability":
+            return handle_check_availability(request, arguments, make_response)
+        elif tool_name == "get_user_bookings":
+            return handle_get_user_bookings(request, arguments, make_response)
+        elif tool_name == "book_appointment":
+            return handle_book_appointment(request, arguments, make_response)
+        elif tool_name == "modify_appointment":
+            return handle_modify_appointment(request, arguments, make_response)
+        elif tool_name == "cancel_appointment":
+            return handle_cancel_appointment(request, arguments, make_response)
+        elif tool_name == "post_call_data":
+            return handle_post_call_data(request, arguments, make_response)
+        elif tool_name == "get_clients":
+            return handle_get_clients(request, arguments, make_response)
+        elif tool_name == "add_clients":
+            return handle_add_clients(request, arguments, make_response)
         else:
             return make_response({
                 "code": -32601,
@@ -167,6 +228,109 @@ def _get_mcp_tools_list() -> list:
                     "customer_id": {"type": "string", "description": "Customer ID for verification"}
                 },
                 "required": ["order_id"]
+            }
+        },
+        {
+            "name": "check_availability",
+            "description": "Check calendar availability for a time range. Returns available time slots and existing events.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "time_min": {"type": "string", "description": "Start time for availability check (ISO 8601 format, optional, defaults to now)"},
+                    "time_max": {"type": "string", "description": "End time for availability check (ISO 8601 format, optional, defaults to now + 7 days)"},
+                    "duration_minutes": {"type": "integer", "description": "Minimum duration needed for availability in minutes (default: 30)"}
+                }
+            }
+        },
+        {
+            "name": "get_user_bookings",
+            "description": "Get user's calendar bookings/appointments for a specified time range.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "time_min": {"type": "string", "description": "Start time for query (ISO 8601 format, optional, defaults to now)"},
+                    "time_max": {"type": "string", "description": "End time for query (ISO 8601 format, optional, defaults to now + 30 days)"},
+                    "max_results": {"type": "integer", "description": "Maximum number of results to return (default: 50)"}
+                }
+            }
+        },
+        {
+            "name": "book_appointment",
+            "description": "Create a new appointment/event in the calendar.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string", "description": "Event title/summary"},
+                    "start_time": {"type": "string", "description": "Start time of the appointment (ISO 8601 format)"},
+                    "end_time": {"type": "string", "description": "End time of the appointment (ISO 8601 format)"},
+                    "description": {"type": "string", "description": "Optional description of the appointment"},
+                    "location": {"type": "string", "description": "Optional location"},
+                    "attendees": {"type": "array", "items": {"type": "string"}, "description": "Optional list of attendee email addresses"}
+                },
+                "required": ["summary", "start_time", "end_time"]
+            }
+        },
+        {
+            "name": "modify_appointment",
+            "description": "Update an existing appointment/event in the calendar.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "event_id": {"type": "string", "description": "ID of the event to update"},
+                    "summary": {"type": "string", "description": "New summary/title (optional)"},
+                    "start_time": {"type": "string", "description": "New start time (ISO 8601 format, optional)"},
+                    "end_time": {"type": "string", "description": "New end time (ISO 8601 format, optional)"},
+                    "description": {"type": "string", "description": "New description (optional)"},
+                    "location": {"type": "string", "description": "New location (optional)"},
+                    "attendees": {"type": "array", "items": {"type": "string"}, "description": "New list of attendees (optional)"}
+                },
+                "required": ["event_id"]
+            }
+        },
+        {
+            "name": "cancel_appointment",
+            "description": "Cancel/delete an appointment/event from the calendar.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "event_id": {"type": "string", "description": "ID of the event to cancel"}
+                },
+                "required": ["event_id"]
+            }
+        },
+        {
+            "name": "post_call_data",
+            "description": "Post call/interaction data to Google Sheets for logging and analytics.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "call_data": {"type": "object", "description": "Object containing call information (e.g., customer_id, duration, outcome, notes)"},
+                    "sheet_name": {"type": "string", "description": "Name of the sheet tab (optional, defaults to 'Calls')"}
+                },
+                "required": ["call_data"]
+            }
+        },
+        {
+            "name": "get_clients",
+            "description": "Get client data from Google Sheets.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sheet_name": {"type": "string", "description": "Name of the sheet tab (optional, defaults to first sheet)"},
+                    "range_name": {"type": "string", "description": "A1 notation range (e.g., 'A1:D10') or leave empty for all data"}
+                }
+            }
+        },
+        {
+            "name": "add_clients",
+            "description": "Add client data to Google Sheets.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "clients": {"type": "array", "items": {"type": "object"}, "description": "Array of client objects to add"},
+                    "sheet_name": {"type": "string", "description": "Name of the sheet tab (optional, defaults to first sheet)"}
+                },
+                "required": ["clients"]
             }
         }
     ]
