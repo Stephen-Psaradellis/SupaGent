@@ -9,6 +9,7 @@ from app.routes import (
     admin,
     test,
     mcp,
+    mcp_debug,
     tools,
     analytics,
     feedback,
@@ -31,6 +32,7 @@ def register_routes(router: APIRouter) -> None:
     router.include_router(admin.router, tags=["admin"])
     router.include_router(test.router, tags=["test"])
     router.include_router(mcp.router, tags=["mcp"])
+    router.include_router(mcp_debug.router, tags=["mcp-debug"])
     router.include_router(tools.router, tags=["tools"])
     router.include_router(analytics.router, tags=["analytics"])
     router.include_router(feedback.router, tags=["feedback"])
