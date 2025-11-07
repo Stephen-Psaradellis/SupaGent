@@ -125,7 +125,6 @@ def test_agent_config(client: ElevenLabs, agent_id: str) -> dict | None:
             print(f"[ERROR] Agent has NO MCP servers configured")
         
         # Check tools
-        tools = conv_config.get('tools', [])
         print(f"\nTools configured: {len(tools)}")
         if tools:
             for tool in tools[:5]:  # Show first 5
@@ -136,8 +135,9 @@ def test_agent_config(client: ElevenLabs, agent_id: str) -> dict | None:
                 print(f"  - Tool ID: {tool_id}")
         
         return {
-            "agent": agent_dict,
+            "agent_id": agent_id_actual,
             "mcp_server_ids": mcp_server_ids,
+            "tools_count": len(tools),
             "knowledge_base": knowledge_base,
             "tools": tools
         }
