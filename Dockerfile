@@ -51,5 +51,5 @@ EXPOSE $PORT
 
 # Run the application with Doppler
 # Note: DOPPLER_TOKEN should be set as an environment variable in your deployment platform
-CMD doppler run -- uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD doppler run -- uvicorn app.main:app
 
