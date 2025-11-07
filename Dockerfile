@@ -3,6 +3,8 @@
 
 FROM python:3.10-slim as builder
 
+ENV DOPPLER_TOKEN=${DOPPLER_TOKEN}
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -47,4 +49,4 @@ RUN mkdir -p /app/data/chroma /app/data/sessions
 
 # Run the application with Doppler
 # Note: DOPPLER_TOKEN should be set as an environment variable in your deployment platform
-CMD ["doppler", "run", "--project", "shortforge", "--config", "dev", "--", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["doppler", "run", "--project", "shortforge", "--config", "dev", "--", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
