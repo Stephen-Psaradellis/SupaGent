@@ -13,6 +13,7 @@ from typing import Any, Dict, Callable
 from memory.mcp_client import MCPClient
 from integrations.google_calendar import get_google_calendar_client
 from integrations.google_sheets import get_google_sheets_client
+from integrations.browser import get_browser_service
 
 
 def handle_search_knowledge_base(
@@ -880,6 +881,271 @@ def handle_add_clients(
                 {
                     "type": "text",
                     "text": f"Error adding clients: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_browser_navigate(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle browser_navigate tool call."""
+    try:
+        browser_service = get_browser_service()
+        url = arguments.get("url", "")
+        if not url:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'url' is required for browser navigation"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        session_id = arguments.get("session_id", "default")
+        wait_for = arguments.get("wait_for")
+        
+        import asyncio
+        result = asyncio.run(browser_service.navigate(
+            url=url,
+            session_id=session_id,
+            wait_for=wait_for,
+        ))
+        
+        if result.get("status") == "error":
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error navigating to {url}: {result.get('error', 'Unknown error')}"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        response_text = f"✅ Navigated to {result.get('url', url)}\n"
+        response_text += f"Title: {result.get('title', 'N/A')}\n"
+        response_text += f"Session ID: {result.get('session_id', session_id)}"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error navigating browser: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_browser_interact(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle browser_interact tool call."""
+    try:
+        browser_service = get_browser_service()
+        action = arguments.get("action", "")
+        if not action:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'action' is required (click, type, submit, scroll, wait)"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        session_id = arguments.get("session_id", "default")
+        selector = arguments.get("selector")
+        text = arguments.get("text")
+        
+        import asyncio
+        result = asyncio.run(browser_service.interact(
+            action=action,
+            selector=selector,
+            text=text,
+            session_id=session_id,
+        ))
+        
+        if result.get("status") == "error":
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error performing {action}: {result.get('error', 'Unknown error')}"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        response_text = f"✅ Successfully performed {action}"
+        if selector:
+            response_text += f" on {selector}"
+        if result.get("result"):
+            response_text += f"\nResult: {result.get('result')}"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error interacting with browser: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_browser_extract(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle browser_extract tool call."""
+    try:
+        browser_service = get_browser_service()
+        extract_type = arguments.get("extract_type", "all")
+        selector = arguments.get("selector")
+        session_id = arguments.get("session_id", "default")
+        
+        import asyncio
+        result = asyncio.run(browser_service.extract(
+            extract_type=extract_type,
+            selector=selector,
+            session_id=session_id,
+        ))
+        
+        if result.get("status") == "error":
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error extracting data: {result.get('error', 'Unknown error')}"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        extracted = result.get("extracted", {})
+        response_text = f"✅ Extracted {extract_type} data:\n\n"
+        
+        if "title" in extracted:
+            response_text += f"Title: {extracted['title']}\n"
+        if "url" in extracted:
+            response_text += f"URL: {extracted['url']}\n"
+        if "text" in extracted:
+            text_preview = extracted['text'][:500]
+            response_text += f"Text (preview): {text_preview}...\n" if len(extracted['text']) > 500 else f"Text: {text_preview}\n"
+        if "links" in extracted:
+            links = extracted['links']
+            response_text += f"Links found: {len(links)}\n"
+            for i, link in enumerate(links[:10], 1):
+                response_text += f"  {i}. {link.get('text', '')} -> {link.get('href', '')}\n"
+            if len(links) > 10:
+                response_text += f"  ... and {len(links) - 10} more links\n"
+        if "metadata" in extracted:
+            metadata = extracted['metadata']
+            response_text += f"Metadata: {len(metadata)} items\n"
+            for key, value in list(metadata.items())[:5]:
+                response_text += f"  {key}: {value}\n"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error extracting from browser: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_browser_screenshot(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle browser_screenshot tool call."""
+    try:
+        browser_service = get_browser_service()
+        session_id = arguments.get("session_id", "default")
+        full_page = arguments.get("full_page", False)
+        selector = arguments.get("selector")
+        
+        import asyncio
+        result = asyncio.run(browser_service.screenshot(
+            session_id=session_id,
+            full_page=full_page,
+            selector=selector,
+        ))
+        
+        if result.get("status") == "error":
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error taking screenshot: {result.get('error', 'Unknown error')}"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        screenshot_path = result.get("screenshot_path", "")
+        screenshot_url = result.get("screenshot_url", "")
+        
+        response_text = f"✅ Screenshot captured successfully\n"
+        response_text += f"Path: {screenshot_path}\n"
+        if screenshot_url:
+            response_text += f"URL: {screenshot_url}"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error taking screenshot: {str(e)}"
                 }
             ],
             "isError": True
