@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import asyncio
+import time
 from typing import Any, Dict, Optional
 from collections import defaultdict
 from fastapi import APIRouter, Request, Response
@@ -16,9 +17,13 @@ from app.dependencies import MCPDep
 logger = logging.getLogger(__name__)
 
 # Store active SSE connections and their response queues
-# Key: connection_id (from client IP or session), Value: asyncio.Queue for responses
-_sse_connections: Dict[str, asyncio.Queue] = {}
+# Key: connection_id, Value: dict with 'queue' and 'metadata'
+_sse_connections: Dict[str, Dict[str, Any]] = {}
 _sse_connection_counter = 0
+
+# Store connection IDs by various identifiers for matching
+_connection_by_ip: Dict[str, str] = {}  # IP -> connection_id
+_connection_by_user_agent: Dict[str, str] = {}  # User-Agent -> connection_id
 from app.routes.mcp_handlers import (
     handle_search_knowledge_base,
     handle_create_ticket,
@@ -34,6 +39,10 @@ from app.routes.mcp_handlers import (
     handle_post_call_data,
     handle_get_clients,
     handle_add_clients,
+    handle_browser_navigate,
+    handle_browser_interact,
+    handle_browser_extract,
+    handle_browser_screenshot,
 )
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -80,10 +89,25 @@ async def mcp_endpoint_get(
     # Generate a unique connection ID for this SSE connection
     global _sse_connection_counter
     _sse_connection_counter += 1
-    connection_id = f"{request.client.host if request.client else 'unknown'}_{_sse_connection_counter}"
+    client_ip = request.client.host if request.client else 'unknown'
+    user_agent = request.headers.get('user-agent', 'unknown')
+    connection_id = f"{client_ip}_{_sse_connection_counter}"
     response_queue = asyncio.Queue()
-    _sse_connections[connection_id] = response_queue
-    logger.info(f"SSE connection established: {connection_id}")
+    
+    # Store connection with metadata for matching
+    _sse_connections[connection_id] = {
+        'queue': response_queue,
+        'ip': client_ip,
+        'user_agent': user_agent,
+        'created_at': time.time()
+    }
+    
+    # Index by IP and User-Agent for matching POST requests
+    _connection_by_ip[client_ip] = connection_id
+    if user_agent:
+        _connection_by_user_agent[user_agent] = connection_id
+    
+    logger.info(f"SSE connection established: {connection_id} (IP: {client_ip}, UA: {user_agent[:50]})")
     
     async def event_stream():
         logger.info(f"Starting SSE event stream for connection {connection_id}")
@@ -96,6 +120,17 @@ async def mcp_endpoint_get(
             }
             yield f"data: {json.dumps(connection_msg)}\n\n"
             logger.info(f"Sent connection initialized notification for {connection_id}")
+            
+            # Also send a connection ID message so client can use it for correlation
+            # This helps match POST requests to SSE connections
+            connection_info = {
+                "jsonrpc": "2.0",
+                "method": "notifications/connection_ready",
+                "params": {
+                    "connection_id": connection_id
+                }
+            }
+            yield f"data: {json.dumps(connection_info)}\n\n"
             
             # If there's an initialize request in query params, respond to it immediately
             if initialize_request:
@@ -148,6 +183,15 @@ async def mcp_endpoint_get(
         finally:
             # Clean up connection
             if connection_id in _sse_connections:
+                conn_data = _sse_connections[connection_id]
+                if isinstance(conn_data, dict):
+                    # Clean up indexes
+                    ip = conn_data.get('ip')
+                    user_agent = conn_data.get('user_agent')
+                    if ip and ip in _connection_by_ip:
+                        del _connection_by_ip[ip]
+                    if user_agent and user_agent in _connection_by_user_agent:
+                        del _connection_by_user_agent[user_agent]
                 del _sse_connections[connection_id]
                 logger.info(f"SSE connection closed: {connection_id}")
     
@@ -160,7 +204,8 @@ async def mcp_endpoint_get(
             "X-Accel-Buffering": "no",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Connection-ID",
+            "X-Connection-ID": connection_id,  # Send connection ID in header for correlation
         }
     )
 
@@ -177,9 +222,15 @@ async def mcp_endpoint(
     Supports both JSON-RPC format and direct method calls.
     """
     # Log the incoming request for debugging
-    logger.info(f"MCP POST request from {request.client.host if request.client else 'unknown'}")
+    client_ip = request.client.host if request.client else "unknown"
+    logger.info(f"MCP POST request from {client_ip}")
     logger.info(f"Request body: {json.dumps(request_body, indent=2)}")
     logger.info(f"Headers: {dict(request.headers)}")
+    
+    # Check for connection ID in header (if client sends it)
+    connection_id_header = request.headers.get('X-Connection-ID')
+    if connection_id_header:
+        logger.info(f"POST request includes connection ID header: {connection_id_header}")
     
     # Handle JSON-RPC format
     method = request_body.get("method") or request_body.get("jsonrpc_method")
@@ -201,24 +252,108 @@ async def mcp_endpoint(
     
     # Try to send response through SSE if there's an active connection
     # For SSE transport, responses should go through the SSE stream, not HTTP
-    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get('user-agent', '')
+    
     sse_connection = None
-    for conn_id, queue in _sse_connections.items():
-        if conn_id.startswith(client_ip):
-            sse_connection = queue
-            logger.info(f"Found SSE connection {conn_id} for POST request")
-            break
+    connection_id = None
+    
+    # Try multiple matching strategies
+    # For MCP with SSE transport, we MUST use SSE if any connection exists
+    # The dashboard expects all responses through SSE, not HTTP
+    
+    # 0. Match by connection ID header if provided (most reliable)
+    if connection_id_header and connection_id_header in _sse_connections:
+        connection_id = connection_id_header
+        conn_data = _sse_connections[connection_id]
+        if isinstance(conn_data, dict):
+            sse_connection = conn_data.get('queue')
+            logger.info(f"Found SSE connection {connection_id} by X-Connection-ID header")
+    
+    # 1. Match by IP (reliable for same-origin requests)
+    if not sse_connection and client_ip in _connection_by_ip:
+        connection_id = _connection_by_ip[client_ip]
+        conn_data = _sse_connections.get(connection_id)
+        if conn_data and isinstance(conn_data, dict):
+            sse_connection = conn_data.get('queue')
+            logger.info(f"Found SSE connection {connection_id} by IP {client_ip}")
+    
+    # 2. Match by User-Agent if IP match failed
+    if not sse_connection and user_agent and user_agent in _connection_by_user_agent:
+        connection_id = _connection_by_user_agent[user_agent]
+        conn_data = _sse_connections.get(connection_id)
+        if conn_data and isinstance(conn_data, dict):
+            sse_connection = conn_data.get('queue')
+            logger.info(f"Found SSE connection {connection_id} by User-Agent")
+    
+    # 3. Find most recent active connection (within last 60 seconds)
+    # This is critical - dashboard POST requests may come from different IPs
+    # but we should use the most recent SSE connection
+    if not sse_connection:
+        current_time = time.time()
+        most_recent = None
+        most_recent_time = 0
+        
+        for conn_id, conn_data in _sse_connections.items():
+            if isinstance(conn_data, dict):
+                created_at = conn_data.get('created_at', 0)
+                # Prefer connections created within last 60 seconds
+                age = current_time - created_at
+                if age < 60 and created_at > most_recent_time:
+                    most_recent_time = created_at
+                    most_recent = (conn_id, conn_data)
+        
+        if most_recent:
+            connection_id, conn_data = most_recent
+            sse_connection = conn_data.get('queue')
+            logger.info(f"Using most recent SSE connection {connection_id} (age: {current_time - most_recent_time:.1f}s)")
+    
+    # 4. Last resort: use ANY active connection if available
+    # This ensures we always use SSE when possible (critical for dashboard validation)
+    if not sse_connection and _sse_connections:
+        # Get the most recently created connection
+        current_time = time.time()
+        most_recent = None
+        most_recent_time = 0
+        for conn_id, conn_data in _sse_connections.items():
+            if isinstance(conn_data, dict):
+                created_at = conn_data.get('created_at', 0)
+                if created_at > most_recent_time:
+                    most_recent_time = created_at
+                    most_recent = (conn_id, conn_data)
+        
+        if most_recent:
+            connection_id, conn_data = most_recent
+            sse_connection = conn_data.get('queue')
+            logger.info(f"Using most recent available SSE connection {connection_id} (last resort)")
+    
+    if sse_connection:
+        logger.info(f"Using SSE connection {connection_id} for POST request from {client_ip}")
+    else:
+        logger.warning(f"[CRITICAL] No SSE connection found for POST request from {client_ip}")
+        logger.warning(f"         Active connections: {len(_sse_connections)}")
+        logger.warning(f"         Connection IDs: {list(_sse_connections.keys())}")
+        logger.warning(f"         This will cause dashboard validation to FAIL!")
     
     async def send_response_via_sse_or_http(response: Dict[str, Any]) -> Dict[str, Any]:
-        """Send response through SSE if available, otherwise return HTTP response."""
+        """Send response through SSE if available, otherwise return HTTP response.
+        
+        For MCP with SSE transport, responses MUST go through SSE stream.
+        Only return HTTP response if absolutely no SSE connection exists.
+        """
         if sse_connection:
             try:
                 await sse_connection.put(response)
-                logger.info(f"Sent response via SSE: {response.get('method', 'response')}")
-                return {"status": "sent_via_sse"}
+                logger.info(f"Sent response via SSE to {connection_id}: method={response.get('method', 'response')}, id={response.get('id', 'N/A')}")
+                # Return a minimal response indicating it was sent via SSE
+                # The actual response will be in the SSE stream
+                return {"status": "sent_via_sse", "connection_id": connection_id}
             except Exception as e:
-                logger.warning(f"Failed to send via SSE, falling back to HTTP: {e}")
-        return response
+                logger.error(f"Failed to send via SSE: {e}", exc_info=True)
+                # Still try HTTP as fallback
+                return response
+        else:
+            logger.warning(f"No SSE connection available - returning HTTP response (this may cause dashboard validation to fail)")
+            return response
     
     if method == "initialize":
         # Handle initialize request - return server capabilities
@@ -283,6 +418,14 @@ async def mcp_endpoint(
                 tool_response = handle_get_clients(request, arguments, make_response)
             elif tool_name == "add_clients":
                 tool_response = handle_add_clients(request, arguments, make_response)
+            elif tool_name == "browser_navigate":
+                tool_response = handle_browser_navigate(request, arguments, make_response)
+            elif tool_name == "browser_interact":
+                tool_response = handle_browser_interact(request, arguments, make_response)
+            elif tool_name == "browser_extract":
+                tool_response = handle_browser_extract(request, arguments, make_response)
+            elif tool_name == "browser_screenshot":
+                tool_response = handle_browser_screenshot(request, arguments, make_response)
             else:
                 logger.warning(f"Unknown tool requested: {tool_name}")
                 tool_response = make_response({
@@ -499,6 +642,57 @@ def _get_mcp_tools_list() -> list:
                     "sheet_name": {"type": "string", "description": "Name of the sheet tab (optional, defaults to first sheet)"}
                 },
                 "required": ["clients"]
+            }
+        },
+        {
+            "name": "browser_navigate",
+            "description": "Navigate to a URL in the browser. Opens and renders web pages with full JavaScript support. Maintains session context for multi-step workflows.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL to navigate to"},
+                    "session_id": {"type": "string", "description": "Browser session ID for maintaining context (defaults to 'default')"},
+                    "wait_for": {"type": "string", "description": "Optional CSS selector or text to wait for after navigation"}
+                },
+                "required": ["url"]
+            }
+        },
+        {
+            "name": "browser_interact",
+            "description": "Perform intelligent interactions on the web page (clicking, typing, submitting forms, scrolling, waiting for elements). Uses BrowserUse's autonomous control for smart element detection.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["click", "type", "submit", "scroll", "wait"], "description": "Action to perform"},
+                    "selector": {"type": "string", "description": "CSS selector, text, or description to identify the element"},
+                    "text": {"type": "string", "description": "Text to type (required for 'type' action)"},
+                    "session_id": {"type": "string", "description": "Browser session ID (defaults to 'default')"}
+                },
+                "required": ["action"]
+            }
+        },
+        {
+            "name": "browser_extract",
+            "description": "Extract structured data from the current page such as titles, text, links, and metadata. Can extract from the entire page or a specific element.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "extract_type": {"type": "string", "enum": ["all", "title", "text", "links", "metadata"], "description": "Type of data to extract (default: 'all')"},
+                    "selector": {"type": "string", "description": "Optional CSS selector to limit extraction to a specific element"},
+                    "session_id": {"type": "string", "description": "Browser session ID (defaults to 'default')"}
+                }
+            }
+        },
+        {
+            "name": "browser_screenshot",
+            "description": "Capture a screenshot of the current page or a specific element. Useful for visual verification or debugging.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "Browser session ID (defaults to 'default')"},
+                    "full_page": {"type": "boolean", "description": "Whether to capture the full scrollable page (default: false)"},
+                    "selector": {"type": "string", "description": "Optional CSS selector to screenshot a specific element"}
+                }
             }
         }
     ]

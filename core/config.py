@@ -57,6 +57,13 @@ class AppConfig:
     crm_api_key: Optional[str] = None
     crm_auth_type: str = "bearer"
     
+    # Browser Configuration
+    browser_allowed_domains: Optional[str] = None  # Comma-separated list or None for all
+    browser_rate_limit: int = 30  # Actions per minute per session
+    browser_screenshot_dir: Optional[str] = None  # Defaults to ./data/screenshots
+    browser_headless: bool = True  # Run browser in headless mode
+    browser_openai_model: str = "gpt-4o-mini"  # OpenAI model for BrowserUse agent
+    
     @classmethod
     def from_env(cls) -> AppConfig:
         """Create configuration from environment variables.
@@ -116,6 +123,13 @@ class AppConfig:
             crm_api_endpoint=os.getenv("CRM_API_ENDPOINT"),
             crm_api_key=os.getenv("CRM_API_KEY"),
             crm_auth_type=os.getenv("CRM_AUTH_TYPE", "bearer"),
+            
+            # Browser
+            browser_allowed_domains=os.getenv("BROWSER_ALLOWED_DOMAINS"),
+            browser_rate_limit=int(os.getenv("BROWSER_RATE_LIMIT", "30")),
+            browser_screenshot_dir=os.getenv("BROWSER_SCREENSHOT_DIR"),
+            browser_headless=os.getenv("BROWSER_HEADLESS", "true").lower() == "true",
+            browser_openai_model=os.getenv("BROWSER_OPENAI_MODEL", "gpt-4o-mini"),
         )
     
     def is_railway(self) -> bool:
@@ -155,6 +169,10 @@ class AppConfig:
             self.escalations_dir,
             self.compliance_dir,
         ]
+        
+        # Add browser screenshot directory if configured
+        if self.browser_screenshot_dir:
+            directories.append(self.browser_screenshot_dir)
         for directory in directories:
             Path(directory).mkdir(parents=True, exist_ok=True)
 
