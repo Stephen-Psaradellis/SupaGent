@@ -15,91 +15,79 @@ from fastapi import FastAPI
 def setup_elevenlabs_mcp_server(app: FastAPI, config: AppConfig) -> None:
     """Setup and register MCP server with ElevenLabs.
     
+    IMPORTANT: This function does NOT create MCP servers or update agents on startup.
+    It only validates that the configured MCP server ID exists.
+    
+    To create/update MCP servers and agents, use:
+    - python tools/setup_mcp_server_and_agent.py (for initial setup)
+    - python tools/update_agent_mcp.py (to update agent with existing MCP server)
+    
     Args:
         app: FastAPI application instance.
         config: Application configuration.
     """
-    def create_or_get_mcp_server() -> Optional[str]:
-        """Create or retrieve MCP server configuration in ElevenLabs."""
+    def verify_mcp_server() -> Optional[str]:
+        """Verify that the configured MCP server ID exists in ElevenLabs.
+        
+        Returns:
+            The MCP server ID if valid, None otherwise.
+        """
         try:
             from elevenlabs.client import ElevenLabs  # type: ignore
             
             if not config.elevenlabs_api_key:
                 return None
             
-            client = ElevenLabs(api_key=config.elevenlabs_api_key)
-            base_url = config.base_url
-            mcp_server_name = config.mcp_server_name
-            
-            # Check if MCP server already exists
-            try:
-                if hasattr(client.conversational_ai, 'mcp_servers'):
-                    mcp_servers = client.conversational_ai.mcp_servers.list()
-                    for server in getattr(mcp_servers, 'servers', []):
-                        server_config = getattr(server, 'config', {})
-                        server_url = server_config.get('url', '') if isinstance(server_config, dict) else getattr(server_config, 'url', '')
-                        if base_url in server_url or getattr(server, 'name', '') == mcp_server_name:
-                            server_id = getattr(server, 'id', None)
-                            if server_id:
+            # If MCP server ID is configured, verify it exists
+            if config.elevenlabs_mcp_server_id:
+                client = ElevenLabs(api_key=config.elevenlabs_api_key)
+                
+                try:
+                    if hasattr(client.conversational_ai, 'mcp_servers'):
+                        mcp_servers = client.conversational_ai.mcp_servers.list()
+                        
+                        # Extract servers list
+                        servers = []
+                        if hasattr(mcp_servers, 'mcp_servers'):
+                            servers = mcp_servers.mcp_servers
+                        elif hasattr(mcp_servers, 'servers'):
+                            servers = mcp_servers.servers
+                        elif isinstance(mcp_servers, list):
+                            servers = mcp_servers
+                        
+                        # Check if configured server ID exists
+                        for server in servers:
+                            server_id = getattr(server, 'id', None) or (server.get('id') if isinstance(server, dict) else None)
+                            if server_id == config.elevenlabs_mcp_server_id:
                                 app.state._mcp_server_id = server_id
                                 return server_id
-            except Exception:
-                pass
+                        
+                        # Server ID not found
+                        app.state._mcp_server_error = f"MCP server {config.elevenlabs_mcp_server_id} not found in ElevenLabs. Please verify the ID or create a new server using tools/setup_mcp_server_and_agent.py"
+                        return None
+                except Exception as e:
+                    app.state._mcp_server_error = f"Failed to verify MCP server: {e}"
+                    return None
             
-            # Create new MCP server
-            try:
-                mcp_config = {
-                    "url": f"{base_url}/mcp",
-                    "name": mcp_server_name,
-                    "description": "SupaGent Knowledge Base MCP Server - Provides access to customer support documentation via vector store search",
-                    "transport": "SSE",
-                    "approval_policy": "auto_approve_all",
-                }
-                
-                if hasattr(client, 'conversational_ai') and hasattr(client.conversational_ai, 'mcp_servers'):
-                    result = client.conversational_ai.mcp_servers.create(config=mcp_config)
-                    server_id = getattr(result, 'id', None)
-                    if server_id:
-                        app.state._mcp_server_id = server_id
-                        # Persist to .env
-                        env_path = Path(".env")
-                        if env_path.exists():
-                            lines = env_path.read_text(encoding="utf-8").splitlines()
-                            lines = [l for l in lines if not l.startswith("ELEVENLABS_MCP_SERVER_ID=")]
-                            lines.append(f"ELEVENLABS_MCP_SERVER_ID={server_id}")
-                            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                        return server_id
-            except Exception as e:
-                app.state._mcp_server_error = str(e)
-                return None
+            # No MCP server ID configured - this is okay, just log it
+            app.state._mcp_server_id = None
+            return None
+            
         except Exception as e:
             app.state._mcp_server_error = str(e)
             return None
     
-    # Store function for use in routes
-    app.state._create_or_get_mcp_server = create_or_get_mcp_server
+    # Store function for use in routes (if needed for future features)
+    app.state._verify_mcp_server = verify_mcp_server
     
-    # Create/register MCP server with ElevenLabs and grant agent access
+    # Only verify the configured MCP server - do NOT create or update anything
     if config.elevenlabs_api_key:
-        mcp_server_id = create_or_get_mcp_server()
+        mcp_server_id = verify_mcp_server()
         if mcp_server_id:
-            os.environ["ELEVENLABS_MCP_SERVER_ID"] = mcp_server_id
-            config.elevenlabs_mcp_server_id = mcp_server_id
-            
-            # Grant agent access to MCP server and knowledge base
-            if config.elevenlabs_agent_id:
-                try:
-                    from agents.agent_testing import ElevenLabsAgentTester
-                    from agents.system_prompt import get_system_prompt
-                    tester = ElevenLabsAgentTester(agent_id=config.elevenlabs_agent_id)
-                    
-                    system_prompt = get_system_prompt()
-                    tester.update_agent(
-                        mcp_server_ids=[mcp_server_id],
-                        prompt=system_prompt
-                    )
-                except Exception as e:
-                    app.state._agent_update_error = str(e)
+            # Store in app state for reference
+            app.state._mcp_server_id = mcp_server_id
+        # Note: We do NOT update the agent here - that should be done manually
+        # via tools/setup_mcp_server_and_agent.py or tools/update_agent_mcp.py
 
 
 def setup_elevenlabs_agent(app: FastAPI, config: AppConfig) -> None:

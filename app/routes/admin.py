@@ -4,6 +4,7 @@ Administrative routes for system management.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Request
 
@@ -103,10 +104,23 @@ def mcp_debug_info(
     request: Request,
 ) -> Dict[str, Any]:
     """Get MCP server debugging information."""
+    from app.routes.mcp import _sse_connections, _connection_by_ip, _connection_by_user_agent
+    
     config = request.app.state.config
     mcp_server_id = config.elevenlabs_mcp_server_id or getattr(request.app.state, "_mcp_server_id", None)
     mcp_error = getattr(request.app.state, "_mcp_server_error", None)
     agent_error = getattr(request.app.state, "_agent_update_error", None)
+    
+    # Get active SSE connections info
+    active_connections = []
+    for conn_id, conn_data in _sse_connections.items():
+        if isinstance(conn_data, dict):
+            active_connections.append({
+                "connection_id": conn_id,
+                "ip": conn_data.get('ip', 'unknown'),
+                "user_agent": conn_data.get('user_agent', 'unknown')[:50],
+                "age_seconds": time.time() - conn_data.get('created_at', 0) if conn_data.get('created_at') else 0
+            })
     
     return {
         "mcp_server": {
@@ -118,6 +132,12 @@ def mcp_debug_info(
         "agent": {
             "id": config.elevenlabs_agent_id,
             "update_error": agent_error,
+        },
+        "sse_connections": {
+            "active_count": len(_sse_connections),
+            "connections": active_connections[:10],  # Show first 10
+            "indexed_by_ip": len(_connection_by_ip),
+            "indexed_by_user_agent": len(_connection_by_user_agent),
         },
         "base_url": config.base_url,
         "note": "Check application logs for detailed MCP request/response information"

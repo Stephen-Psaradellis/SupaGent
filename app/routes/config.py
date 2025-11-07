@@ -41,26 +41,32 @@ def configure_mcp_endpoint(
     request: Request,
     config: ConfigDep,
 ) -> Dict[str, Any]:
-    """Manually trigger MCP server creation/registration with ElevenLabs."""
+    """Verify MCP server configuration.
+    
+    NOTE: This endpoint only verifies the configured MCP server ID.
+    To create a new MCP server and associate it with the agent, use:
+    python tools/setup_mcp_server_and_agent.py
+    """
     if not config.elevenlabs_api_key:
         return {"success": False, "error": "ELEVENLABS_API_KEY not set in Doppler"}
     
-    # Get the create_or_get_mcp_server function from app state
-    create_or_get_mcp_server = getattr(request.app.state, "_create_or_get_mcp_server", None)
-    if not create_or_get_mcp_server:
-        return {"success": False, "error": "MCP server creation function not available. Restart the app to initialize."}
+    # Get the verify function from app state
+    verify_mcp_server = getattr(request.app.state, "_verify_mcp_server", None)
+    if not verify_mcp_server:
+        return {"success": False, "error": "MCP server verification function not available. Restart the app to initialize."}
     
-    mcp_server_id = create_or_get_mcp_server()
+    mcp_server_id = verify_mcp_server()
     if mcp_server_id:
         return {
             "success": True,
-            "message": "MCP server configured successfully",
-            "mcp_server_id": mcp_server_id
+            "message": "MCP server verified successfully",
+            "mcp_server_id": mcp_server_id,
+            "note": "To create a new MCP server, use: python tools/setup_mcp_server_and_agent.py"
         }
     else:
         error = getattr(request.app.state, "_mcp_server_error", None)
         return {
             "success": False,
-            "error": error or "Failed to create/register MCP server. Check API key and network connectivity."
+            "error": error or "MCP server not configured or not found. Set ELEVENLABS_MCP_SERVER_ID or create one using tools/setup_mcp_server_and_agent.py"
         }
 

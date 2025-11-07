@@ -121,16 +121,8 @@ async def mcp_endpoint_get(
             yield f"data: {json.dumps(connection_msg)}\n\n"
             logger.info(f"Sent connection initialized notification for {connection_id}")
             
-            # Also send a connection ID message so client can use it for correlation
-            # This helps match POST requests to SSE connections
-            connection_info = {
-                "jsonrpc": "2.0",
-                "method": "notifications/connection_ready",
-                "params": {
-                    "connection_id": connection_id
-                }
-            }
-            yield f"data: {json.dumps(connection_info)}\n\n"
+            # Note: We don't send connection_ready notification as it's not part of standard MCP protocol
+            # The dashboard will send initialize POST and expect response through SSE
             
             # If there's an initialize request in query params, respond to it immediately
             if initialize_request:
@@ -163,10 +155,17 @@ async def mcp_endpoint_get(
             while True:
                 try:
                     # Wait for either a response or timeout for keepalive
+                    # Use shorter timeout (2s) to respond faster to dashboard validation
                     try:
-                        response_data = await asyncio.wait_for(response_queue.get(), timeout=10.0)
-                        logger.info(f"Sending response through SSE for {connection_id}: {response_data.get('method', 'response')}")
-                        yield f"data: {json.dumps(response_data)}\n\n"
+                        response_data = await asyncio.wait_for(response_queue.get(), timeout=2.0)
+                        # Skip status messages
+                        if isinstance(response_data, dict) and response_data.get('status') == 'sent_via_sse':
+                            response_queue.task_done()
+                            continue
+                        logger.info(f"Sending response through SSE for {connection_id}: method={response_data.get('method', 'response')}, id={response_data.get('id', 'N/A')}")
+                        # Ensure proper SSE format - must be exactly "data: <json>\n\n"
+                        json_str = json.dumps(response_data, ensure_ascii=False)
+                        yield f"data: {json_str}\n\n"
                         response_queue.task_done()
                     except asyncio.TimeoutError:
                         # Timeout - send keepalive
@@ -342,17 +341,22 @@ async def mcp_endpoint(
         """
         if sse_connection:
             try:
+                # Put response in queue - it will be sent through SSE stream
                 await sse_connection.put(response)
-                logger.info(f"Sent response via SSE to {connection_id}: method={response.get('method', 'response')}, id={response.get('id', 'N/A')}")
-                # Return a minimal response indicating it was sent via SSE
-                # The actual response will be in the SSE stream
+                logger.info(f"Queued response for SSE to {connection_id}: method={response.get('method', 'response')}, id={response.get('id', 'N/A')}")
+                
+                # For dashboard validation, we need to ensure the response is sent quickly
+                # Return minimal response - actual response goes through SSE
                 return {"status": "sent_via_sse", "connection_id": connection_id}
             except Exception as e:
-                logger.error(f"Failed to send via SSE: {e}", exc_info=True)
-                # Still try HTTP as fallback
+                logger.error(f"Failed to queue response for SSE: {e}", exc_info=True)
+                # Fallback to HTTP if SSE queue fails
                 return response
         else:
-            logger.warning(f"No SSE connection available - returning HTTP response (this may cause dashboard validation to fail)")
+            logger.error(f"[CRITICAL] No SSE connection available for POST from {client_ip}")
+            logger.error(f"         Active connections: {len(_sse_connections)}")
+            logger.error(f"         Connection IDs: {list(_sse_connections.keys())[:5]}")
+            logger.error(f"         Returning HTTP response - dashboard validation will FAIL!")
             return response
     
     if method == "initialize":
