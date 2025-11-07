@@ -12,17 +12,37 @@ class ElevenLabsAgentClient:
 
     Uses the ElevenLabs Agents API to generate speech responses. If the SDK
     or credentials aren't available, raises RuntimeError on use.
+    
+    This client provides access to fully-managed ElevenLabs Agents, which
+    handle voice I/O, context management, and tool calling automatically.
+    
+    Attributes:
+        CHUNK_BYTES: Default chunk size for streaming audio (32KB).
     """
 
     CHUNK_BYTES = 32_768
 
     def __init__(self, agent_id: Optional[str] = None):
+        """Initialize ElevenLabs Agent client.
+        
+        Args:
+            agent_id: Optional agent ID. If not provided, reads from
+                ELEVENLABS_AGENT_ID environment variable.
+                
+        Raises:
+            RuntimeError: If agent_id is not set or SDK is not installed.
+        """
         self.agent_id = agent_id or os.getenv("ELEVENLABS_AGENT_ID")
         if not self.agent_id:
             raise RuntimeError("ELEVENLABS_AGENT_ID is not set.")
         self._init_sdk()
 
     def _init_sdk(self) -> None:
+        """Initialize the ElevenLabs SDK client.
+        
+        Raises:
+            RuntimeError: If SDK is not installed or API key is missing.
+        """
         try:
             from elevenlabs.client import ElevenLabs  # type: ignore
         except Exception as e:
@@ -38,6 +58,12 @@ class ElevenLabsAgentClient:
         """Send prompt to Agent and return synthesized audio bytes (mp3).
 
         This uses a non-streaming convenience approach: collect chunks and return bytes.
+        
+        Args:
+            prompt: Text prompt to send to the agent for speech synthesis.
+            
+        Returns:
+            Complete MP3 audio bytes.
         """
         try:
             stream = self._stream_from_prompt(prompt)
@@ -50,6 +76,17 @@ class ElevenLabsAgentClient:
             raise
 
     def _stream_from_prompt(self, prompt: str):
+        """Stream audio from agent prompt in real-time.
+        
+        Args:
+            prompt: Text prompt to send to the agent.
+            
+        Yields:
+            Audio byte chunks as they become available.
+            
+        Raises:
+            RuntimeError: If streaming API is not available in the SDK version.
+        """
         # Try a streaming method on the Agents API
         try:
             stream = self._client.agents.speak(
@@ -72,14 +109,37 @@ class ElevenLabsVoiceAgent:
     """Voice agent that delegates speech generation to an ElevenLabs Agent.
 
     It still uses our RAG pipeline to ensure retrieval through MCP and to
-    attach sources, but uses the Agent for spoken output.
+    attach sources, but uses the Agent for spoken output. This provides
+    the best of both worlds: our RAG-based knowledge retrieval with
+    ElevenLabs' high-quality voice synthesis.
     """
 
     def __init__(self, rag: RAGAnswerer, agent_client: ElevenLabsAgentClient):
+        """Initialize the ElevenLabs voice agent.
+        
+        Args:
+            rag: RAGAnswerer instance for generating grounded answers.
+            agent_client: ElevenLabsAgentClient for speech synthesis.
+        """
         self._rag = rag
         self._client = agent_client
 
     def answer(self, question: str) -> Dict[str, Any]:
+        """Generate a voice answer using RAG + ElevenLabs Agent.
+        
+        Uses RAG to retrieve context and generate a text answer, then
+        synthesizes it using the ElevenLabs Agent for high-quality voice output.
+        
+        Args:
+            question: The user's question.
+            
+        Returns:
+            Dictionary containing:
+                - "answer": Text answer from RAG
+                - "sources": Source document metadata
+                - "audio_base64": Base64-encoded MP3 audio
+                - "provider": "elevenlabs-agent"
+        """
         # Use RAG to ground the response and produce sources
         result = self._rag.answer(question)
         answer_text = result.get("answer", "")
@@ -92,6 +152,14 @@ class ElevenLabsVoiceAgent:
         return result
 
     def stream_answer(self, question: str):
+        """Stream audio answer in real-time using ElevenLabs Agent.
+        
+        Args:
+            question: The user's question.
+            
+        Yields:
+            Audio byte chunks in MP3 format.
+        """
         result = self._rag.answer(question)
         answer_text = result.get("answer", "")
         if not answer_text:
