@@ -283,7 +283,7 @@ def build_app() -> FastAPI:
         """Manually trigger MCP server creation/registration with ElevenLabs."""
         cfg = app.state.config
         if not cfg.elevenlabs_api_key:
-            return {"success": False, "error": "ELEVENLABS_API_KEY not set"}
+            return {"success": False, "error": "ELEVENLABS_API_KEY not set in Doppler"}
         
         mcp_server_id = create_or_get_mcp_server()
         if mcp_server_id:
@@ -340,7 +340,7 @@ def build_app() -> FastAPI:
         data = await file.read()
         mime = file.content_type
         if engine is None:
-            return {"text": "", "warnings": ["ASR not configured. Install elevenlabs and set ELEVENLABS_API_KEY."]}
+            return {"text": "", "warnings": ["ASR not configured. Install elevenlabs and set ELEVENLABS_API_KEY in Doppler."]}
         try:
             text = engine.transcribe(data, mime)
             return {"text": text}
@@ -825,7 +825,6 @@ def build_app() -> FastAPI:
                     title = arguments.get("title", "")
                     description = arguments.get("description", "")
                     if not crm:
-                        import time
                         ticket_id = f"ticket_{int(time.time())}"
                         return make_response({
                             "content": [
@@ -906,9 +905,11 @@ def build_app() -> FastAPI:
                     
                     conversation_history = []
                     if session_id:
-                        session_data = sessions.get_session(session_id)
-                        if session_data:
-                            conversation_history = session_data.get("messages", [])
+                        turns = sessions.history(session_id)
+                        conversation_history = [
+                            {"role": turn.role, "text": turn.text, "timestamp": turn.ts}
+                            for turn in turns
+                        ]
                     
                     escalation = EscalationContext(
                         session_id=session_id,
@@ -918,8 +919,7 @@ def build_app() -> FastAPI:
                         retrieved_documents=[],
                         confidence_scores=[],
                         suggested_responses=[],
-                        customer_id=arguments.get("customer_id"),
-                        conversation_summary=arguments.get("conversation_summary")
+                        customer_id=arguments.get("customer_id")
                     )
                     
                     escalations.save_escalation(escalation)
@@ -1190,9 +1190,11 @@ def build_app() -> FastAPI:
             # Get conversation history
             conversation_history = []
             if request.session_id:
-                session_data = sessions.get_session(request.session_id)
-                if session_data:
-                    conversation_history = session_data.get("messages", [])
+                turns = sessions.history(request.session_id)
+                conversation_history = [
+                    {"role": turn.role, "text": turn.text, "timestamp": turn.ts}
+                    for turn in turns
+                ]
             
             # Create escalation context
             escalation = EscalationContext(
@@ -1203,8 +1205,7 @@ def build_app() -> FastAPI:
                 retrieved_documents=[],
                 confidence_scores=[],
                 suggested_responses=[],
-                customer_id=request.customer_id,
-                conversation_summary=request.conversation_summary
+                customer_id=request.customer_id
             )
             
             # Save escalation
@@ -1792,7 +1793,7 @@ def build_app() -> FastAPI:
         except Exception as e:
             return {
                 "error": str(e),
-                "note": "Make sure ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID are set",
+                "note": "Make sure ELEVENLABS_API_KEY (in Doppler) and ELEVENLABS_AGENT_ID are set",
             }
 
     @app.post("/agent-tests/run")

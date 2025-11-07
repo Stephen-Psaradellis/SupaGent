@@ -22,11 +22,19 @@ RUN pip install --upgrade pip && \
 # Runtime stage - smaller image
 FROM python:3.10-slim
 
+# Install Doppler CLI
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    gnupg \
+    && curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy installed packages from builder
 COPY --from=builder /root/.local /root/.local
 
-# Set PATH to use local packages
-ENV PATH=/root/.local/bin:$PATH
+# Set PATH to use local packages and Doppler
+ENV PATH=/root/.local/bin:/usr/local/bin:$PATH
 
 WORKDIR /app
 
@@ -39,6 +47,7 @@ RUN mkdir -p /app/data/chroma /app/data/sessions
 # Expose port (Railway sets PORT env var)
 EXPOSE $PORT
 
-# Run the application
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Run the application with Doppler
+# Note: DOPPLER_TOKEN should be set as an environment variable in your deployment platform
+CMD doppler run -- uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 

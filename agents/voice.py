@@ -64,9 +64,11 @@ class ElevenLabsTTS:
             raise RuntimeError(
                 "elevenlabs SDK not installed. Run `pip install elevenlabs` to enable TTS.") from e
 
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        from core.secrets import get_elevenlabs_api_key
+        
+        api_key = get_elevenlabs_api_key()
         if not api_key:
-            raise RuntimeError("ELEVENLABS_API_KEY not set in environment.")
+            raise RuntimeError("ELEVENLABS_API_KEY not set in Doppler.")
 
         set_api_key(api_key)
         self._client = ElevenLabs(api_key=api_key)

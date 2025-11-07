@@ -1,0 +1,132 @@
+{
+  "domain_id": "gitlab",
+  "company_name": "GitLab",
+  "product_name": "GitLab",
+  "agent_name": "Alex",
+  "support_type": "technical support",
+  "industry": "software development",
+  "test_scenarios": [
+    {
+      "name": "Password Reset Query",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I reset my password?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "password",
+        "reset"
+      ]
+    },
+    {
+      "name": "SSH Key Configuration",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I configure SSH keys?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "SSH",
+        "key"
+      ]
+    },
+    {
+      "name": "CI/CD Pipeline Setup",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I set up a CI/CD pipeline?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "pipeline",
+        "CI",
+        "CD"
+      ]
+    },
+    {
+      "name": "Merge Request Creation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "How do I create a merge request?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "merge request"
+      ]
+    },
+    {
+      "name": "GitLab Runner Setup",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What are GitLab runners and how do I set them up?"
+        }
+      ],
+      "expected_tool_calls": [
+        "knowledgebase"
+      ],
+      "expected_keywords": [
+        "runner"
+      ]
+    }
+  ],
+  "eval_questions": [
+    {
+      "question": "How do I reset my password?",
+      "expected_substring": "password"
+    },
+    {
+      "question": "How do I configure SSH keys?",
+      "expected_substring": "SSH"
+    },
+    {
+      "question": "What are GitLab runners?",
+      "expected_substring": "runner"
+    },
+    {
+      "question": "How do I create a new project?",
+      "expected_substring": "project"
+    },
+    {
+      "question": "How to set up CI/CD pipeline?",
+      "expected_substring": "pipeline"
+    },
+    {
+      "question": "How do I create a merge request?",
+      "expected_substring": "merge request"
+    },
+    {
+      "question": "How do I file an issue?",
+      "expected_substring": "issue"
+    },
+    {
+      "question": "How to use labels for issues?",
+      "expected_substring": "labels"
+    },
+    {
+      "question": "How do I create a milestone?",
+      "expected_substring": "milestone"
+    },
+    {
+      "question": "How do I enable two-factor authentication?",
+      "expected_substring": "two-factor"
+    }
+  ],
+  "prompt_customizations": {}
+}

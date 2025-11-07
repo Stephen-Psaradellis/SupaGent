@@ -38,9 +38,14 @@ def main():
     )
     args = parser.parse_args()
     
+    from core.secrets import get_elevenlabs_api_key
+    from dotenv import load_dotenv
+    
+    load_dotenv()  # Load .env for ELEVENLABS_AGENT_ID
+    
     # Check for required environment variables
-    if not os.getenv("ELEVENLABS_API_KEY"):
-        print("Error: ELEVENLABS_API_KEY not set.", file=sys.stderr)
+    if not get_elevenlabs_api_key():
+        print("Error: ELEVENLABS_API_KEY not set in Doppler.", file=sys.stderr)
         sys.exit(1)
     
     if not os.getenv("ELEVENLABS_AGENT_ID"):

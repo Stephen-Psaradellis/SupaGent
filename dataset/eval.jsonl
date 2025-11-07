@@ -8,23 +8,3 @@
 {"question": "How to use labels for issues?", "expected_substring": "labels"}
 {"question": "How do I create a milestone?", "expected_substring": "milestone"}
 {"question": "How do I enable two-factor authentication?", "expected_substring": "two-factor"}
-{"question": "How do I add SSH deploy keys?", "expected_substring": "deploy key"}
-{"question": "How do I protect a branch?", "expected_substring": "protected branch"}
-{"question": "How do I set CI variables?", "expected_substring": "CI variables"}
-{"question": "How do I use the container registry?", "expected_substring": "registry"}
-{"question": "How do I register a GitLab Runner?", "expected_substring": "register"}
-{"question": "How do I configure LDAP sign-in?", "expected_substring": "LDAP"}
-{"question": "How do I configure SAML SSO?", "expected_substring": "SAML"}
-{"question": "How do I set up environments and deployments?", "expected_substring": "environment"}
-{"question": "How do I cache dependencies in CI?", "expected_substring": "cache"}
-{"question": "How do I store CI artifacts?", "expected_substring": "artifact"}
-{"question": "How do I publish GitLab Pages?", "expected_substring": "Pages"}
-{"question": "How do I fork a project?", "expected_substring": "fork"}
-{"question": "How do I mirror a repository?", "expected_substring": "mirror"}
-{"question": "How do I configure webhooks?", "expected_substring": "webhook"}
-{"question": "How do I manage group memberships?", "expected_substring": "group"}
-{"question": "How do I create a subgroup?", "expected_substring": "subgroup"}
-{"question": "How do I manage project permissions?", "expected_substring": "permissions"}
-{"question": "How do I back up GitLab?", "expected_substring": "back"}
-{"question": "How do I restore from backup?", "expected_substring": "restore"}
-{"question": "How do I upgrade GitLab?", "expected_substring": "upgrade"}

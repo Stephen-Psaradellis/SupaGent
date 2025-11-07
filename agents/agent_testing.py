@@ -63,18 +63,23 @@ class ElevenLabsAgentTester:
         
         Args:
             agent_id: Optional agent ID. If not provided, reads from ELEVENLABS_AGENT_ID env var.
-            api_key: Optional API key. If not provided, reads from ELEVENLABS_API_KEY env var.
+            api_key: Optional API key. If not provided, reads from Doppler.
             
         Raises:
             RuntimeError: If agent_id or api_key is not set (either via args or env vars).
         """
+        from core.secrets import get_elevenlabs_api_key
+        from dotenv import load_dotenv
+        
+        load_dotenv()  # Load .env for ELEVENLABS_AGENT_ID
+        
         self.agent_id = agent_id or os.getenv("ELEVENLABS_AGENT_ID")
-        self.api_key = api_key or os.getenv("ELEVENLABS_API_KEY")
+        self.api_key = api_key or get_elevenlabs_api_key()
         
         if not self.agent_id:
             raise RuntimeError("ELEVENLABS_AGENT_ID is not set.")
         if not self.api_key:
-            raise RuntimeError("ELEVENLABS_API_KEY is not set.")
+            raise RuntimeError("ELEVENLABS_API_KEY is not set in Doppler.")
         
         self._headers = {
             "xi-api-key": self.api_key,
