@@ -109,11 +109,21 @@ def setup_elevenlabs_agent(app: FastAPI, config: AppConfig) -> None:
         app: FastAPI application instance.
         config: Application configuration.
     """
-    if config.elevenlabs_api_key and not config.elevenlabs_agent_id:
+    # If agent ID is already set, skip auto-creation
+    if config.elevenlabs_agent_id:
+        return
+    
+    if config.elevenlabs_api_key:
         try:
             from elevenlabs.client import ElevenLabs  # type: ignore
             
             client = ElevenLabs(api_key=config.elevenlabs_api_key)
+            
+            # Check if agents API is available
+            if not hasattr(client, 'agents'):
+                app.state._agent_error = "Installed elevenlabs SDK version does not support agents API. Update SDK or set ELEVENLABS_AGENT_ID manually."
+                return
+            
             agent_name = os.getenv("SUPAGENT_AGENT_NAME", "SupaGent Support Agent")
             agent = client.agents.create(name=agent_name)
             
@@ -131,6 +141,8 @@ def setup_elevenlabs_agent(app: FastAPI, config: AppConfig) -> None:
                     ]
                 lines.append(f"ELEVENLABS_AGENT_ID={aid}")
                 env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except AttributeError as e:
+            app.state._agent_error = f"SDK version does not support agents API: {e}. Update SDK or set ELEVENLABS_AGENT_ID manually."
         except Exception as e:
             app.state._agent_error = str(e)
 

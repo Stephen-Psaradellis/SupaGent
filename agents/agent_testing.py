@@ -344,20 +344,26 @@ class ElevenLabsAgentTester:
         """
         payload = {}
         
-        if mcp_server_ids is not None:
-            payload["mcp_server_ids"] = mcp_server_ids
+        # MCP server IDs and knowledge base IDs need to be nested in conversation_config.agent.prompt
+        # based on the API response structure
+        needs_prompt_config = mcp_server_ids is not None or knowledge_base_ids is not None or prompt is not None
         
-        if knowledge_base_ids is not None:
-            payload["knowledge_base_ids"] = knowledge_base_ids
-        
-        if prompt is not None:
-            # Update the prompt in conversation_config.agent.prompt.prompt
+        if needs_prompt_config:
             if "conversation_config" not in payload:
                 payload["conversation_config"] = {}
             if "agent" not in payload["conversation_config"]:
                 payload["conversation_config"]["agent"] = {}
             if "prompt" not in payload["conversation_config"]["agent"]:
                 payload["conversation_config"]["agent"]["prompt"] = {}
+        
+        if mcp_server_ids is not None:
+            payload["conversation_config"]["agent"]["prompt"]["mcp_server_ids"] = mcp_server_ids
+        
+        if knowledge_base_ids is not None:
+            # Knowledge base might be a different field, but let's try it in the same structure
+            payload["conversation_config"]["agent"]["prompt"]["knowledge_base"] = knowledge_base_ids
+        
+        if prompt is not None:
             payload["conversation_config"]["agent"]["prompt"]["prompt"] = prompt
         
         # Add any other fields from kwargs

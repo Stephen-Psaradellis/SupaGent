@@ -40,3 +40,4 @@ def log_crm_interaction(
     success = crm.log_interaction(customer_id, activity_type, details)
     return {"success": success}
 
+

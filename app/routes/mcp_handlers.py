@@ -7,9 +7,12 @@ Separated from the main MCP route for better organization.
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Any, Dict, Callable
 
 from memory.mcp_client import MCPClient
+from integrations.google_calendar import get_google_calendar_client
+from integrations.google_sheets import get_google_sheets_client
 
 
 def handle_search_knowledge_base(
@@ -255,4 +258,631 @@ def handle_check_order(
             ],
             "isError": True
         }, is_error=True)
+
+
+def handle_check_availability(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle check_availability tool call."""
+    try:
+        calendar_client = get_google_calendar_client()
+        if not calendar_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Calendar not configured. Please configure GOOGLE_CALENDAR_CREDENTIALS_PATH and GOOGLE_CALENDAR_TOKEN_PATH"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        # Parse time parameters
+        time_min = None
+        time_max = None
+        if arguments.get("time_min"):
+            time_min = datetime.fromisoformat(arguments["time_min"].replace('Z', '+00:00'))
+        if arguments.get("time_max"):
+            time_max = datetime.fromisoformat(arguments["time_max"].replace('Z', '+00:00'))
+        
+        duration_minutes = arguments.get("duration_minutes", 30)
+        
+        result = calendar_client.check_availability(
+            time_min=time_min,
+            time_max=time_max,
+            duration_minutes=duration_minutes
+        )
+        
+        if result.get("error"):
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result["error"]
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        # Format response
+        available_slots = result.get("available_slots", [])
+        events = result.get("events", [])
+        
+        response_text = f"Availability check: {result.get('summary', '')}\n\n"
+        response_text += f"Found {len(available_slots)} available slots:\n"
+        for i, slot in enumerate(available_slots[:10], 1):  # Show first 10
+            response_text += f"{i}. {slot.get('start')} - {slot.get('end')} ({slot.get('duration_minutes')} min)\n"
+        
+        if len(available_slots) > 10:
+            response_text += f"\n... and {len(available_slots) - 10} more slots\n"
+        
+        if events:
+            response_text += f"\nExisting events: {len(events)}\n"
+            for event in events[:5]:  # Show first 5
+                response_text += f"- {event.get('summary')} ({event.get('start')})\n"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error checking availability: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_get_user_bookings(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle getUserBookings tool call."""
+    try:
+        calendar_client = get_google_calendar_client()
+        if not calendar_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Calendar not configured. Please configure GOOGLE_CALENDAR_CREDENTIALS_PATH and GOOGLE_CALENDAR_TOKEN_PATH"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        # Parse time parameters
+        time_min = None
+        time_max = None
+        if arguments.get("time_min"):
+            time_min = datetime.fromisoformat(arguments["time_min"].replace('Z', '+00:00'))
+        if arguments.get("time_max"):
+            time_max = datetime.fromisoformat(arguments["time_max"].replace('Z', '+00:00'))
+        
+        max_results = arguments.get("max_results", 50)
+        
+        result = calendar_client.get_user_bookings(
+            time_min=time_min,
+            time_max=time_max,
+            max_results=max_results
+        )
+        
+        if result.get("error"):
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result["error"]
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        bookings = result.get("bookings", [])
+        response_text = f"User bookings: {result.get('summary', '')}\n\n"
+        
+        if not bookings:
+            response_text += "No bookings found in the specified time range."
+        else:
+            for i, booking in enumerate(bookings, 1):
+                response_text += f"{i}. {booking.get('summary')}\n"
+                response_text += f"   Start: {booking.get('start')}\n"
+                response_text += f"   End: {booking.get('end')}\n"
+                if booking.get('location'):
+                    response_text += f"   Location: {booking.get('location')}\n"
+                response_text += "\n"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error getting user bookings: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_book_appointment(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle bookAppointment tool call."""
+    try:
+        calendar_client = get_google_calendar_client()
+        if not calendar_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Calendar not configured. Please configure GOOGLE_CALENDAR_CREDENTIALS_PATH and GOOGLE_CALENDAR_TOKEN_PATH"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        summary = arguments.get("summary", "")
+        if not summary:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'summary' is required for booking an appointment"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        # Parse datetime strings
+        start_time_str = arguments.get("start_time", "")
+        end_time_str = arguments.get("end_time", "")
+        
+        if not start_time_str or not end_time_str:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'start_time' and 'end_time' are required (ISO format)"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+        end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+        
+        result = calendar_client.book_appointment(
+            summary=summary,
+            start_time=start_time,
+            end_time=end_time,
+            description=arguments.get("description"),
+            location=arguments.get("location"),
+            attendees=arguments.get("attendees", [])
+        )
+        
+        if result.get("success"):
+            response_text = f"✅ {result.get('message', 'Appointment booked successfully')}\n"
+            response_text += f"Event ID: {result.get('event_id')}\n"
+            response_text += f"Start: {result.get('start')}\n"
+            response_text += f"End: {result.get('end')}\n"
+            if result.get("html_link"):
+                response_text += f"Calendar link: {result.get('html_link')}\n"
+        else:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result.get("message", "Failed to book appointment")
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error booking appointment: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_modify_appointment(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle modifyAppointment tool call."""
+    try:
+        calendar_client = get_google_calendar_client()
+        if not calendar_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Calendar not configured. Please configure GOOGLE_CALENDAR_CREDENTIALS_PATH and GOOGLE_CALENDAR_TOKEN_PATH"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        event_id = arguments.get("event_id", "")
+        if not event_id:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'event_id' is required for modifying an appointment"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        # Parse optional datetime strings
+        start_time = None
+        end_time = None
+        if arguments.get("start_time"):
+            start_time = datetime.fromisoformat(arguments["start_time"].replace('Z', '+00:00'))
+        if arguments.get("end_time"):
+            end_time = datetime.fromisoformat(arguments["end_time"].replace('Z', '+00:00'))
+        
+        result = calendar_client.modify_appointment(
+            event_id=event_id,
+            summary=arguments.get("summary"),
+            start_time=start_time,
+            end_time=end_time,
+            description=arguments.get("description"),
+            location=arguments.get("location"),
+            attendees=arguments.get("attendees")
+        )
+        
+        if result.get("success"):
+            response_text = f"✅ {result.get('message', 'Appointment modified successfully')}\n"
+            response_text += f"Event ID: {result.get('event_id')}\n"
+            response_text += f"Start: {result.get('start')}\n"
+            response_text += f"End: {result.get('end')}\n"
+            if result.get("html_link"):
+                response_text += f"Calendar link: {result.get('html_link')}\n"
+        else:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result.get("message", "Failed to modify appointment")
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error modifying appointment: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_cancel_appointment(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle cancelAppointment tool call."""
+    try:
+        calendar_client = get_google_calendar_client()
+        if not calendar_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Calendar not configured. Please configure GOOGLE_CALENDAR_CREDENTIALS_PATH and GOOGLE_CALENDAR_TOKEN_PATH"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        event_id = arguments.get("event_id", "")
+        if not event_id:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'event_id' is required for cancelling an appointment"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        result = calendar_client.cancel_appointment(event_id=event_id)
+        
+        if result.get("success"):
+            response_text = f"✅ {result.get('message', 'Appointment cancelled successfully')}\n"
+            response_text += f"Event ID: {result.get('event_id')}\n"
+        else:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result.get("message", "Failed to cancel appointment")
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error cancelling appointment: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_post_call_data(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle postCallData tool call."""
+    try:
+        sheets_client = get_google_sheets_client()
+        if not sheets_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Sheets not configured. Please configure GOOGLE_SHEETS_CREDENTIALS_PATH, GOOGLE_SHEETS_TOKEN_PATH, and GOOGLE_SHEETS_SPREADSHEET_ID"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        call_data = arguments.get("call_data", {})
+        if not call_data:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'call_data' is required (object with call information)"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        sheet_name = arguments.get("sheet_name")
+        
+        result = sheets_client.post_call_data(
+            call_data=call_data,
+            sheet_name=sheet_name
+        )
+        
+        if result.get("success"):
+            response_text = f"✅ {result.get('message', 'Call data posted successfully')}"
+        else:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result.get("message", "Failed to post call data")
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error posting call data: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_get_clients(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle getClients tool call."""
+    try:
+        sheets_client = get_google_sheets_client()
+        if not sheets_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Sheets not configured. Please configure GOOGLE_SHEETS_CREDENTIALS_PATH, GOOGLE_SHEETS_TOKEN_PATH, and GOOGLE_SHEETS_SPREADSHEET_ID"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        sheet_name = arguments.get("sheet_name")
+        range_name = arguments.get("range_name")
+        
+        result = sheets_client.get_clients(
+            sheet_name=sheet_name,
+            range_name=range_name
+        )
+        
+        if result.get("error"):
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result["error"]
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        clients = result.get("clients", [])
+        response_text = f"Retrieved {len(clients)} client(s)\n\n"
+        
+        if not clients:
+            response_text += "No clients found in the sheet."
+        else:
+            for i, client in enumerate(clients, 1):
+                response_text += f"Client {i}:\n"
+                for key, value in client.items():
+                    response_text += f"  {key}: {value}\n"
+                response_text += "\n"
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error getting clients: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
+
+def handle_add_clients(
+    request: Any,
+    arguments: Dict[str, Any],
+    make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle addClients tool call."""
+    try:
+        sheets_client = get_google_sheets_client()
+        if not sheets_client:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Google Sheets not configured. Please configure GOOGLE_SHEETS_CREDENTIALS_PATH, GOOGLE_SHEETS_TOKEN_PATH, and GOOGLE_SHEETS_SPREADSHEET_ID"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        clients = arguments.get("clients", [])
+        if not clients:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: 'clients' is required (array of client objects)"
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        sheet_name = arguments.get("sheet_name")
+        
+        result = sheets_client.add_clients(
+            clients=clients,
+            sheet_name=sheet_name
+        )
+        
+        if result.get("success"):
+            response_text = f"✅ {result.get('message', 'Clients added successfully')}\n"
+            response_text += f"Added {result.get('added_count', 0)} client(s)"
+        else:
+            return make_response({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": result.get("message", "Failed to add clients")
+                    }
+                ],
+                "isError": True
+            }, is_error=True)
+        
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": response_text
+                }
+            ]
+        })
+    except Exception as e:
+        return make_response({
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Error adding clients: {str(e)}"
+                }
+            ],
+            "isError": True
+        }, is_error=True)
+
 

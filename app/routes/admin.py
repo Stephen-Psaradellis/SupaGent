@@ -97,3 +97,4 @@ def resolve_knowledge_gap(
         "message": f"Knowledge gap for '{query_text}' marked as resolved",
     }
 
+
