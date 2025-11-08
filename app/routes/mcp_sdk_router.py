@@ -322,3 +322,21 @@ async def mcp_health() -> dict[str, Any]:
         "tool_count": tool_count,
         "tools": tool_names
     }
+
+
+@router.get("/debug/tools")
+async def debug_tools() -> dict[str, Any]:
+    """Debug endpoint to test tools retrieval."""
+    try:
+        tools = await list_available_tools()
+        return {
+            "success": True,
+            "tool_count": len(tools),
+            "tools": [tool.model_dump() for tool in tools]
+        }
+    except Exception as e:
+        logger.error(f"Error in debug tools: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e)
+        }
