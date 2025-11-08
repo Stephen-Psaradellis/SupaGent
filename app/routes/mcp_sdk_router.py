@@ -12,8 +12,9 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
+from mcp import types
 
-from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN
+from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN, list_available_tools
 
 logger = logging.getLogger(__name__)
 
@@ -88,18 +89,43 @@ async def mcp_sse(
             init_msg = {
                 "jsonrpc": "2.0",
                 "method": "notifications/initialized",
-                "params": {}
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "serverInfo": {
+                        "name": server.name,
+                        "version": "1.0.0"
+                    },
+                    "capabilities": {
+                        "tools": {},
+                        "logging": {}
+                    }
+                }
             }
             yield f"data: {json.dumps(init_msg)}\n\n"
-            logger.info("Sent SSE initialization notification")
-            
+            logger.info("📤 Sent MCP server initialization via SSE")
+
+            # Get and send tools list
+            try:
+                import asyncio
+                tools = await list_available_tools()
+                tools_msg = {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/tools/list_changed",
+                    "params": {
+                        "tools": [tool.model_dump() for tool in tools]
+                    }
+                }
+                yield f"data: {json.dumps(tools_msg)}\n\n"
+                logger.info(f"📤 Sent tools list via SSE ({len(tools)} tools)")
+            except Exception as e:
+                logger.error(f"Error sending tools list via SSE: {e}", exc_info=True)
+
             # Keep connection alive with periodic keepalives
-            import asyncio
             keepalive_count = 0
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(15)  # Increased from 5 to 15 seconds
                 keepalive_count += 1
-                if keepalive_count % 12 == 0:
+                if keepalive_count % 4 == 0:  # Log every minute (15s * 4 = 60s)
                     logger.debug(f"SSE keepalive #{keepalive_count}")
                 yield f": keepalive\n\n"
                     
