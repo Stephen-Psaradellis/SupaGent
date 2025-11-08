@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 def create_mcp_app():
     """
-    Create the MCP ASGI app using the SDK's built-in Streamable HTTP transport.
+    Create the MCP ASGI app using the SDK's built-in SSE transport.
 
     The SDK handles all MCP protocol compliance, tool discovery, and transport automatically.
     """
-    # Configure the server for Streamable HTTP transport
-    mcp_app = server.streamable_http_app()
+    # Configure the server for SSE transport
+    mcp_app = server.sse_app()
 
     # Add authentication middleware if required
     if MCP_AUTH_REQUIRED and MCP_AUTH_TOKEN:

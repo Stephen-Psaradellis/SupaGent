@@ -52,7 +52,7 @@ MCP_AUTH_REQUIRED = os.getenv("MCP_AUTH_REQUIRED", "false").lower() == "true"
 MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN", "")
 
 # Initialize MCP Server using official SDK
-server = FastMCP(MCP_SERVER_NAME)
+server = FastMCP(MCP_SERVER_NAME, sse_path="/")
 
 
 # ============================================================================
