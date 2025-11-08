@@ -10,6 +10,7 @@ from app.routes import (
     test,
     mcp,
     mcp_debug,
+    mcp_sdk_router,  # NEW: Official MCP SDK-based implementation
     tools,
     analytics,
     feedback,
@@ -33,6 +34,7 @@ def register_routes(router: APIRouter) -> None:
     router.include_router(test.router, tags=["test"])
     router.include_router(mcp.router, tags=["mcp"])
     router.include_router(mcp_debug.router, tags=["mcp-debug"])
+    router.include_router(mcp_sdk_router.router, tags=["mcp-sdk"])  # NEW: SDK-based MCP endpoint
     router.include_router(tools.router, tags=["tools"])
     router.include_router(analytics.router, tags=["analytics"])
     router.include_router(feedback.router, tags=["feedback"])
