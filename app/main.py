@@ -27,7 +27,28 @@ def build_app() -> FastAPI:
         Configured FastAPI application instance.
     """
     app = FastAPI(title="SupaGent Support Agent")
-    
+
+    logger = logging.getLogger(__name__)
+    # Add CORS middleware for ElevenLabs and other integrations
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allow all origins for MCP server
+        allow_credentials=True,
+        allow_methods=["*"],  # Allow all methods
+        allow_headers=["*"],  # Allow all headers
+    )
+    # Add request logging middleware for debugging
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        """Log all incoming requests for debugging."""
+        # Only log MCP-related requests to avoid noise
+        if "/mcp" in request.url.path:
+            logger.info(f"📥 Incoming {request.method} request to {request.url.path}")
+            logger.info(f"   Client: {request.client.host if request.client else 'unknown'}")
+            logger.info(f"   Headers: {dict(request.headers)}")
+        response = await call_next(request)
+        return response
+        
     # Initialize configuration and service container
     config = get_config()
     container = create_container(config)
