@@ -13,8 +13,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
 
-from mcp import types
-from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN
+from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN, list_available_tools
 
 logger = logging.getLogger(__name__)
 
@@ -80,27 +79,55 @@ async def mcp_sse(
             detail="Unauthorized: Invalid or missing MCP authorization token"
         )
     
-    logger.info(f"MCP SSE connection from {request.client.host if request.client else 'unknown'}")
+    logger.info(f"🔥 MCP SSE connection from {request.client.host if request.client else 'unknown'}")
     
     async def event_stream():
         """Generate SSE events for the MCP session."""
         try:
-            # Send initialization notification
+            # Send initialization notification with server info
+            logger.info("📤 Sending MCP server initialization via SSE")
             init_msg = {
                 "jsonrpc": "2.0",
                 "method": "notifications/initialized",
-                "params": {}
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "serverInfo": {
+                        "name": server.name,
+                        "version": "1.0.0"
+                    },
+                    "capabilities": {
+                        "tools": {},
+                        "logging": {}
+                    }
+                }
             }
             yield f"data: {json.dumps(init_msg)}\n\n"
-            logger.info("Sent SSE initialization notification")
+            logger.info("✅ Sent SSE initialization notification")
+            
+            # Get tools list and send via SSE
+            logger.info("📤 Sending tools list via SSE")
+            try:
+                tools = await list_available_tools()
+                tools_list_msg = {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/tools/list_changed",
+                    "params": {
+                        "tools": [tool.model_dump() for tool in tools]
+                    }
+                }
+                yield f"data: {json.dumps(tools_list_msg)}\n\n"
+                logger.info(f"✅ Sent {len(tools)} tools via SSE")
+            except Exception as e:
+                logger.error(f"Error getting tools list for SSE: {e}", exc_info=True)
+                # Continue even if tools list fails
             
             # Keep connection alive with periodic keepalives
             import asyncio
             keepalive_count = 0
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(15)  # Changed to 15 seconds as per documentation
                 keepalive_count += 1
-                if keepalive_count % 12 == 0:
+                if keepalive_count % 4 == 0:  # Log every 4 keepalives (every minute)
                     logger.debug(f"SSE keepalive #{keepalive_count}")
                 yield f": keepalive\n\n"
                     
@@ -132,14 +159,14 @@ async def mcp_endpoint(
     client_ip = request.client.host if request.client else "unknown"
     method = request_body.get("method", "unknown")
     request_id = request_body.get("id")
-
+    
     logger.info("=" * 80)
     logger.info(f"🔥 MCP ENDPOINT HIT (SDK)")
     logger.info(f"   Client IP: {client_ip}")
     logger.info(f"   Method: {method}")
     logger.info(f"   Request ID: {request_id}")
     logger.info("=" * 80)
-
+    
     # Validate authorization
     if not validate_authorization(authorization):
         logger.warning(f"Unauthorized MCP POST request from {client_ip}")
@@ -151,7 +178,7 @@ async def mcp_endpoint(
                 "message": "Unauthorized: Invalid or missing MCP authorization token"
             }
         }
-
+    
     try:
         if method == "initialize":
             logger.info("Handling initialize request via SDK")
@@ -170,15 +197,13 @@ async def mcp_endpoint(
                     }
                 }
             }
-
+            
         elif method == "tools/list":
             logger.info("Handling tools/list request via SDK")
 
             # Get tools from the SDK server's list_tools handler
             try:
-                tools_result = await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest())
-                tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
-
+                tools = await list_available_tools()
                 logger.info(f"Returning {len(tools)} tools from SDK")
 
                 return {
@@ -270,8 +295,7 @@ async def mcp_endpoint(
 async def mcp_health() -> dict[str, Any]:
     """Health check endpoint for MCP server."""
     try:
-        tools_result = await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest())
-        tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
+        tools = await list_available_tools()
         tool_count = len(tools)
         tool_names = [tool.name for tool in tools]
     except Exception as e:
