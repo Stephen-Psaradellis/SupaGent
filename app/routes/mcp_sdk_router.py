@@ -325,10 +325,11 @@ async def mcp_health() -> dict[str, Any]:
 
 
 @router.get("/debug/tools")
-async def debug_tools() -> dict[str, Any]:
+def debug_tools() -> dict[str, Any]:
     """Debug endpoint to test tools retrieval."""
     try:
-        tools = await list_available_tools()
+        import asyncio
+        tools = asyncio.run(list_available_tools())
         return {
             "success": True,
             "tool_count": len(tools),
