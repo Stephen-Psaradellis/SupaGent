@@ -149,33 +149,207 @@ def _get_generic_test_suite() -> list[TestScenario]:
 def get_tool_invocation_test_suite() -> list[TestScenario]:
     """Get a test suite focused on tool invocation testing.
     
-    Returns test scenarios from the current domain configuration that focus on
-    tool invocation, or falls back to generic tool invocation tests.
+    Returns test scenarios for all MCP tools, ensuring each tool has at least one
+    tool invocation test. Falls back to generic tool invocation tests if needed.
     
     Returns:
         List of TestScenario objects focused on tool invocation verification.
     """
-    from core.domain_config import get_domain_config
+    # Always return comprehensive MCP tool invocation tests
+    return _get_all_mcp_tool_invocation_tests()
+
+
+def _get_all_mcp_tool_invocation_tests() -> list[TestScenario]:
+    """Get tool invocation tests for all available MCP tools.
     
-    domain = get_domain_config()
+    Creates one test scenario for each MCP tool to verify that the agent
+    correctly invokes each tool when appropriate. These tests use tool_call_parameters
+    to verify actual tool invocation, not just message content.
     
-    # Use domain-specific test scenarios if available, filter for tool invocation tests
-    if domain.test_scenarios:
-        scenarios = []
-        for scenario_data in domain.test_scenarios:
-            # Include scenarios that have expected_tool_calls
-            if scenario_data.get("expected_tool_calls"):
-                scenarios.append(TestScenario(
-                    name=scenario_data.get("name", "Unnamed Test"),
-                    messages=scenario_data.get("messages", []),
-                    expected_tool_calls=scenario_data.get("expected_tool_calls"),
-                    expected_keywords=[],  # Tool invocation tests don't check keywords
-                ))
-        if scenarios:
-            return scenarios
-    
-    # Fallback to generic tool invocation tests
-    return _get_generic_tool_invocation_test_suite()
+    Returns:
+        List of TestScenario objects, one for each MCP tool.
+    """
+    return [
+        # Knowledge Base Tool
+        TestScenario(
+            name="Tool Invocation - search_knowledge_base",
+            messages=[
+                {"role": "user", "content": "How do I reset my password?"}
+            ],
+            expected_tool_calls=["search_knowledge_base"],
+            expected_keywords=[],
+        ),
+        
+        # Support Ticket Tool
+        TestScenario(
+            name="Tool Invocation - create_support_ticket",
+            messages=[
+                {"role": "user", "content": "I need to create a support ticket for an issue I'm experiencing"}
+            ],
+            expected_tool_calls=["create_support_ticket"],
+            expected_keywords=[],
+        ),
+        
+        # Customer Info Tool
+        TestScenario(
+            name="Tool Invocation - get_customer_info",
+            messages=[
+                {"role": "user", "content": "Can you look up my account information? My email is customer@example.com"}
+            ],
+            expected_tool_calls=["get_customer_info"],
+            expected_keywords=[],
+        ),
+        
+        # Escalation Tool
+        TestScenario(
+            name="Tool Invocation - escalate_to_human",
+            messages=[
+                {"role": "user", "content": "I need to speak with a human agent about a complex issue"}
+            ],
+            expected_tool_calls=["escalate_to_human"],
+            expected_keywords=[],
+        ),
+        
+        # Log Interaction Tool
+        TestScenario(
+            name="Tool Invocation - log_interaction",
+            messages=[
+                {"role": "user", "content": "Please log this conversation for my customer record"}
+            ],
+            expected_tool_calls=["log_interaction"],
+            expected_keywords=[],
+        ),
+        
+        # Order Status Tool
+        TestScenario(
+            name="Tool Invocation - check_order_status",
+            messages=[
+                {"role": "user", "content": "What's the status of my order #12345?"}
+            ],
+            expected_tool_calls=["check_order_status"],
+            expected_keywords=[],
+        ),
+        
+        # Calendar Availability Tool
+        TestScenario(
+            name="Tool Invocation - check_availability",
+            messages=[
+                {"role": "user", "content": "What times are available for an appointment next week?"}
+            ],
+            expected_tool_calls=["check_availability"],
+            expected_keywords=[],
+        ),
+        
+        # Get User Bookings Tool
+        TestScenario(
+            name="Tool Invocation - get_user_bookings",
+            messages=[
+                {"role": "user", "content": "Show me all my upcoming appointments"}
+            ],
+            expected_tool_calls=["get_user_bookings"],
+            expected_keywords=[],
+        ),
+        
+        # Book Appointment Tool
+        TestScenario(
+            name="Tool Invocation - book_appointment",
+            messages=[
+                {"role": "user", "content": "I'd like to schedule an appointment for tomorrow at 2pm"}
+            ],
+            expected_tool_calls=["book_appointment"],
+            expected_keywords=[],
+        ),
+        
+        # Modify Appointment Tool
+        TestScenario(
+            name="Tool Invocation - modify_appointment",
+            messages=[
+                {"role": "user", "content": "I need to reschedule my appointment to a different time"}
+            ],
+            expected_tool_calls=["modify_appointment"],
+            expected_keywords=[],
+        ),
+        
+        # Cancel Appointment Tool
+        TestScenario(
+            name="Tool Invocation - cancel_appointment",
+            messages=[
+                {"role": "user", "content": "Please cancel my appointment"}
+            ],
+            expected_tool_calls=["cancel_appointment"],
+            expected_keywords=[],
+        ),
+        
+        # Post Call Data Tool
+        TestScenario(
+            name="Tool Invocation - post_call_data",
+            messages=[
+                {"role": "user", "content": "Please log this call data to the system"}
+            ],
+            expected_tool_calls=["post_call_data"],
+            expected_keywords=[],
+        ),
+        
+        # Get Clients Tool
+        TestScenario(
+            name="Tool Invocation - get_clients",
+            messages=[
+                {"role": "user", "content": "Show me the list of clients from the database"}
+            ],
+            expected_tool_calls=["get_clients"],
+            expected_keywords=[],
+        ),
+        
+        # Add Clients Tool
+        TestScenario(
+            name="Tool Invocation - add_clients",
+            messages=[
+                {"role": "user", "content": "I need to add a new client to the system"}
+            ],
+            expected_tool_calls=["add_clients"],
+            expected_keywords=[],
+        ),
+        
+        # Browser Navigate Tool
+        TestScenario(
+            name="Tool Invocation - browser_navigate",
+            messages=[
+                {"role": "user", "content": "Please navigate to https://example.com and show me what's there"}
+            ],
+            expected_tool_calls=["browser_navigate"],
+            expected_keywords=[],
+        ),
+        
+        # Browser Interact Tool
+        TestScenario(
+            name="Tool Invocation - browser_interact",
+            messages=[
+                {"role": "user", "content": "Click on the login button on the current page"}
+            ],
+            expected_tool_calls=["browser_interact"],
+            expected_keywords=[],
+        ),
+        
+        # Browser Extract Tool
+        TestScenario(
+            name="Tool Invocation - browser_extract",
+            messages=[
+                {"role": "user", "content": "Extract all the text and links from the current webpage"}
+            ],
+            expected_tool_calls=["browser_extract"],
+            expected_keywords=[],
+        ),
+        
+        # Browser Screenshot Tool
+        TestScenario(
+            name="Tool Invocation - browser_screenshot",
+            messages=[
+                {"role": "user", "content": "Take a screenshot of the current page"}
+            ],
+            expected_tool_calls=["browser_screenshot"],
+            expected_keywords=[],
+        ),
+    ]
 
 
 def _get_generic_tool_invocation_test_suite() -> list[TestScenario]:
