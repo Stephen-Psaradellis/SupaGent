@@ -1226,5 +1226,5 @@ async def list_available_tools() -> list[types.Tool]:
 
 
 # Export the server instance for integration with FastAPI
-__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN"]
+__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN", "list_available_tools"]
 
