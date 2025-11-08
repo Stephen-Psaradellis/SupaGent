@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from mcp import types
 
-from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN, list_available_tools
+from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,9 @@ async def mcp_sse(
             # Get and send tools list
             try:
                 import asyncio
-                tools = await list_available_tools()
+                tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
+                tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
+
                 tools_msg = {
                     "jsonrpc": "2.0",
                     "method": "notifications/tools/list_changed",
