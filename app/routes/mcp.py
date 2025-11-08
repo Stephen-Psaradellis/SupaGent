@@ -342,8 +342,26 @@ async def mcp_endpoint(
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
         
-        logger.info(f"Handling tools/call for tool: {tool_name}")
-        logger.info(f"Tool arguments: {json.dumps(arguments, indent=2)}")
+        # Log tool invocation prominently
+        logger.info("=" * 80)
+        logger.info(f"🔧 TOOL INVOCATION: {tool_name}")
+        logger.info(f"   Client IP: {client_ip}")
+        logger.info(f"   Request ID: {request_id}")
+        
+        # Log key arguments (sanitized for sensitive data)
+        if arguments:
+            # Create a sanitized version of arguments for logging
+            sanitized_args = {}
+            for key, value in arguments.items():
+                if isinstance(value, str) and len(value) > 100:
+                    sanitized_args[key] = value[:100] + "... (truncated)"
+                elif key.lower() in ['password', 'token', 'secret', 'api_key', 'auth']:
+                    sanitized_args[key] = "***REDACTED***"
+                else:
+                    sanitized_args[key] = value
+            logger.info(f"   Arguments: {json.dumps(sanitized_args, indent=2)}")
+        
+        logger.info("=" * 80)
         
         try:
             tool_response = None
@@ -392,9 +410,17 @@ async def mcp_endpoint(
             
             # Send response through SSE if available
             if tool_response:
+                # Log successful tool execution
+                logger.info(f"✅ TOOL COMPLETED: {tool_name} - Response sent successfully")
                 return await send_response_via_sse_or_http(tool_response)
+            
+            logger.warning(f"⚠️  TOOL COMPLETED: {tool_name} - No response generated")
             return tool_response
         except Exception as e:
+            logger.error("=" * 80)
+            logger.error(f"❌ TOOL ERROR: {tool_name}")
+            logger.error(f"   Error: {str(e)}")
+            logger.error("=" * 80)
             logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
             error_response = make_response({
                 "code": -32603,
