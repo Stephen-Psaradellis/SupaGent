@@ -13,6 +13,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
 
+from mcp import types
 from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN
 
 logger = logging.getLogger(__name__)
@@ -131,14 +132,14 @@ async def mcp_endpoint(
     client_ip = request.client.host if request.client else "unknown"
     method = request_body.get("method", "unknown")
     request_id = request_body.get("id")
-    
+
     logger.info("=" * 80)
     logger.info(f"🔥 MCP ENDPOINT HIT (SDK)")
     logger.info(f"   Client IP: {client_ip}")
     logger.info(f"   Method: {method}")
     logger.info(f"   Request ID: {request_id}")
     logger.info("=" * 80)
-    
+
     # Validate authorization
     if not validate_authorization(authorization):
         logger.warning(f"Unauthorized MCP POST request from {client_ip}")
@@ -150,7 +151,7 @@ async def mcp_endpoint(
                 "message": "Unauthorized: Invalid or missing MCP authorization token"
             }
         }
-    
+
     try:
         if method == "initialize":
             logger.info("Handling initialize request via SDK")
@@ -169,14 +170,13 @@ async def mcp_endpoint(
                     }
                 }
             }
-            
+
         elif method == "tools/list":
             logger.info("Handling tools/list request via SDK")
 
             # Get tools from the SDK server's list_tools handler
             try:
-                import asyncio
-                tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
+                tools_result = await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest())
                 tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
 
                 logger.info(f"Returning {len(tools)} tools from SDK")
@@ -270,8 +270,7 @@ async def mcp_endpoint(
 async def mcp_health() -> dict[str, Any]:
     """Health check endpoint for MCP server."""
     try:
-        import asyncio
-        tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
+        tools_result = await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest())
         tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
         tool_count = len(tools)
         tool_names = [tool.name for tool in tools]
