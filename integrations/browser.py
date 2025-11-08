@@ -15,20 +15,6 @@ from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
 try:
-    from browser_use_sdk import Agent, Browser, BrowserConfig
-    BROWSER_USE_AVAILABLE = True
-except ImportError:
-    try:
-        from browser_use import Agent, Browser, BrowserConfig
-        BROWSER_USE_AVAILABLE = True
-    except ImportError:
-        # Fallback if browser-use is not available
-        Agent = None
-        Browser = None
-        BrowserConfig = None
-        BROWSER_USE_AVAILABLE = False
-
-try:
     from playwright.async_api import Page, BrowserContext, async_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
@@ -40,6 +26,35 @@ except ImportError:
 from core.secrets import get_openai_api_key
 
 logger = logging.getLogger(__name__)
+
+# Try different browser-use package versions and APIs
+BROWSER_USE_AVAILABLE = False
+Agent = None
+Browser = None
+BrowserConfig = None
+
+# Try modern browser-use API (Python 3.11+ required)
+try:
+    from browser_use import Agent, Browser, BrowserConfig
+    BROWSER_USE_AVAILABLE = True
+    logger.info("✅ Browser-use package available - AI-powered automation enabled")
+except ImportError:
+    # Try legacy browser-use-sdk API
+    try:
+        from browser_use_sdk import BrowserUse as Agent, BrowserUse as Browser
+        # Create a simple BrowserConfig class for compatibility
+        class BrowserConfig:
+            def __init__(self, headless=True, **kwargs):
+                self.headless = headless
+        BROWSER_USE_AVAILABLE = True
+        logger.info("✅ Browser-use-sdk package available - basic automation enabled")
+    except ImportError:
+        logger.warning(
+            "Browser-use package not available. Browser automation will use "
+            "Playwright directly without AI-powered features. "
+            "To enable advanced features, upgrade to Python 3.11+ and install browser-use>=0.9.0"
+        )
+        BROWSER_USE_AVAILABLE = False
 
 
 class BrowserSession:

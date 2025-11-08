@@ -1,7 +1,7 @@
 # Optimized Dockerfile for Railway
 # Uses multi-stage build and better caching
 
-FROM python:3.10-slim as builder
+FROM python:3.11-slim as builder
 
 ENV DOPPLER_TOKEN=${DOPPLER_TOKEN}
 
@@ -22,7 +22,7 @@ RUN pip install --upgrade pip && \
     pip install --user --no-cache-dir -r requirements.txt
 
 # Runtime stage - smaller image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Install Doppler CLI
 RUN apt-get update && apt-get install -y apt-transport-https ca-certificates curl gnupg && \
