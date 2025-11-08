@@ -173,78 +173,54 @@ async def mcp_endpoint(
         elif method == "tools/list":
             logger.info("Handling tools/list request via SDK")
             
-            # Get tools from the SDK server - check for different attribute names
-            tool_handlers = None
-            if hasattr(server, '_tool_handlers'):
-                logger.info("Found _tool_handlers attribute")
-                tool_handlers = server._tool_handlers
-            elif hasattr(server, '_tools'):
-                logger.info("Found _tools attribute")
-                tool_handlers = server._tools  
-            elif hasattr(server, '_request_handlers') and hasattr(server._request_handlers, 'call_tool'):
-                logger.info("Found _request_handlers.call_tool")
-                tool_handlers = server._request_handlers.call_tool
-            elif hasattr(server, 'list_tools'):
-                logger.info("Found list_tools method")
-                # SDK might have a list_tools method
-                tool_handlers = server.list_tools()
-            else:
-                # Debug: log all non-dunder attributes
-                attrs = [attr for attr in dir(server) if not attr.startswith('__')]
-                logger.warning(f"Could not find tool handlers. Server attributes: {attrs[:20]}")
-            
+            # Get tools from the SDK server
             tools = []
-            if tool_handlers:
+            for tool_name, tool_func in server._tool_handlers.items():
                 import inspect
-                for tool_name, tool_func in (tool_handlers.items() if hasattr(tool_handlers, 'items') else enumerate(tool_handlers)):
-                    if isinstance(tool_name, int):
-                        # Skip if we got a list instead of dict
-                        continue
-                        
-                    sig = inspect.signature(tool_func)
+                sig = inspect.signature(tool_func)
+                
+                properties = {}
+                required = []
+                
+                for param_name, param in sig.parameters.items():
+                    param_type = param.annotation
                     
-                    properties = {}
-                    required = []
+                    if param_type == str:
+                        properties[param_name] = {"type": "string"}
+                    elif param_type == int:
+                        properties[param_name] = {"type": "integer"}
+                    elif param_type == bool:
+                        properties[param_name] = {"type": "boolean"}
+                    elif param_type == float:
+                        properties[param_name] = {"type": "number"}
+                    elif hasattr(param_type, "__origin__"):
+                        origin = param_type.__origin__
+                        if origin is list:
+                            properties[param_name] = {"type": "array"}
+                        elif origin is dict:
+                            properties[param_name] = {"type": "object"}
+                    else:
+                        properties[param_name] = {"type": "string"}
                     
-                    for param_name, param in sig.parameters.items():
-                        param_type = param.annotation
-                        
-                        if param_type == str:
-                            properties[param_name] = {"type": "string"}
-                        elif param_type == int:
-                            properties[param_name] = {"type": "integer"}
-                        elif param_type == bool:
-                            properties[param_name] = {"type": "boolean"}
-                        elif param_type == float:
-                            properties[param_name] = {"type": "number"}
-                        elif hasattr(param_type, "__origin__"):
-                            origin = param_type.__origin__
-                            if origin is list:
-                                properties[param_name] = {"type": "array"}
-                            elif origin is dict:
-                                properties[param_name] = {"type": "object"}
-                        else:
-                            properties[param_name] = {"type": "string"}
-                        
-                        if tool_func.__doc__:
-                            properties[param_name]["description"] = f"Parameter: {param_name}"
-                        
-                        if param.default == inspect.Parameter.empty and not (
-                            hasattr(param_type, "__origin__") and 
-                            param_type.__origin__ is type(Optional)
-                        ):
-                            required.append(param_name)
+                    if tool_func.__doc__:
+                        properties[param_name]["description"] = f"Parameter: {param_name}"
                     
-                    tool_schema = {
-                        "name": tool_name,
-                        "description": tool_func.__doc__ or f"Tool: {tool_name}",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": properties,
-                            "required": required
-                        }
+                    if param.default == inspect.Parameter.empty and not (
+                        hasattr(param_type, "__origin__") and 
+                        param_type.__origin__ is type(Optional)
+                    ):
+                        required.append(param_name)
+                
+                tool_schema = {
+                    "name": tool_name,
+                    "description": tool_func.__doc__ or f"Tool: {tool_name}",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": required
                     }
-                    tools.append(tool_schema)
+                }
+                tools.append(tool_schema)
             
             logger.info(f"Returning {len(tools)} tools from SDK")
             
@@ -263,16 +239,7 @@ async def mcp_endpoint(
             logger.info(f"🔧 TOOL INVOCATION via SDK: {tool_name}")
             logger.info(f"   Arguments: {list(arguments.keys())}")
             
-            # Get tool handlers - check for different attribute names
-            tool_handlers = None
-            if hasattr(server, '_tool_handlers'):
-                tool_handlers = server._tool_handlers
-            elif hasattr(server, '_tools'):
-                tool_handlers = server._tools
-            elif hasattr(server, '_request_handlers') and hasattr(server._request_handlers, 'call_tool'):
-                tool_handlers = server._request_handlers.call_tool
-            
-            if not tool_handlers or tool_name not in tool_handlers:
+            if tool_name not in server._tool_handlers:
                 logger.warning(f"Unknown tool requested: {tool_name}")
                 return {
                     "jsonrpc": "2.0",
@@ -283,7 +250,7 @@ async def mcp_endpoint(
                     }
                 }
             
-            tool_handler = tool_handlers[tool_name]
+            tool_handler = server._tool_handlers[tool_name]
             
             try:
                 result = await tool_handler(**arguments)
@@ -335,22 +302,10 @@ async def mcp_endpoint(
 @router.get("/health")
 async def mcp_health() -> dict[str, Any]:
     """Health check endpoint for MCP server."""
-    # Get tool handlers - check for different attribute names
-    tool_handlers = None
-    if hasattr(server, '_tool_handlers'):
-        tool_handlers = server._tool_handlers
-    elif hasattr(server, '_tools'):
-        tool_handlers = server._tools
-    elif hasattr(server, '_request_handlers') and hasattr(server._request_handlers, 'call_tool'):
-        tool_handlers = server._request_handlers.call_tool
-    
-    tool_count = len(tool_handlers) if tool_handlers else 0
-    tool_names = list(tool_handlers.keys()) if tool_handlers and hasattr(tool_handlers, 'keys') else []
-    
     return {
         "status": "healthy",
         "server_name": server.name,
         "sdk_version": "official",
-        "tool_count": tool_count,
-        "tools": tool_names
+        "tool_count": len(server._tool_handlers),
+        "tools": list(server._tool_handlers.keys())
     }
