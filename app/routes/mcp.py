@@ -1,5 +1,20 @@
 """
 MCP (Model Context Protocol) routes.
+
+This module implements an MCP server following the Model Context Protocol specification:
+- https://modelcontextprotocol.io/docs/develop/build-server
+- https://modelcontextprotocol.io/docs/learn/server-concepts
+- https://modelcontextprotocol.io/specification/versioning
+- https://modelcontextprotocol.io/docs/tutorials/security/authorization
+
+Key MCP Compliance Features:
+- Protocol Version: 2024-11-05 (date-based versioning per MCP spec)
+- Tool Naming: snake_case format (per MCP guidelines)
+- Transport: HTTP/SSE (Server-Sent Events) for real-time communication
+- JSON-RPC 2.0: All requests/responses follow JSON-RPC format
+- Error Handling: Proper JSON-RPC error codes (-32600 to -32700)
+- Logging: Uses logging module (not stdout) for HTTP-based servers
+- Authorization: Bearer token validation (configurable via MCP_AUTH_REQUIRED)
 """
 from __future__ import annotations
 
@@ -7,14 +22,22 @@ import json
 import logging
 import asyncio
 import time
+import os
 from typing import Any, Dict, Optional
 from collections import defaultdict
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import MCPDep
 
 logger = logging.getLogger(__name__)
+
+# MCP Configuration
+MCP_PROTOCOL_VERSION = "2024-11-05"  # Per MCP versioning spec (YYYY-MM-DD format)
+MCP_SERVER_NAME = "SupaGent Knowledge Base"
+MCP_SERVER_VERSION = "1.0.0"
+MCP_AUTH_REQUIRED = os.getenv("MCP_AUTH_REQUIRED", "false").lower() == "true"
+MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN", "")  # Optional bearer token for authorization
 
 # Store active SSE connections and their response queues
 # Key: connection_id, Value: dict with 'queue' and 'metadata'
@@ -48,6 +71,42 @@ from app.routes.mcp_handlers import (
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
+def validate_mcp_authorization(authorization: Optional[str] = None) -> bool:
+    """
+    Validate MCP request authorization per MCP security guidelines.
+    
+    Per MCP authorization spec:
+    - Clients must use Authorization header: "Authorization: Bearer <access-token>"
+    - If MCP_AUTH_REQUIRED is enabled, token must match MCP_AUTH_TOKEN
+    - If auth is not required, all requests are allowed (for development/testing)
+    
+    Args:
+        authorization: Authorization header value (e.g., "Bearer <token>")
+        
+    Returns:
+        True if authorized, False otherwise
+    """
+    if not MCP_AUTH_REQUIRED:
+        # Authorization not required - allow all requests
+        return True
+    
+    if not MCP_AUTH_TOKEN:
+        # Auth required but no token configured - deny all
+        logger.warning("MCP_AUTH_REQUIRED is true but MCP_AUTH_TOKEN is not set")
+        return False
+    
+    if not authorization:
+        # No authorization header provided
+        return False
+    
+    # Extract token from "Bearer <token>" format
+    if not authorization.startswith("Bearer "):
+        return False
+    
+    token = authorization[7:].strip()  # Remove "Bearer " prefix
+    return token == MCP_AUTH_TOKEN
+
+
 @router.options("")
 async def mcp_endpoint_options(request: Request) -> Response:
     """Handle CORS preflight requests for MCP endpoint."""
@@ -68,13 +127,27 @@ async def mcp_endpoint_options(request: Request) -> Response:
 async def mcp_endpoint_get(
     request: Request,
     mcp: MCPDep = None,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> Response:
     """MCP protocol endpoint for SSE (Server-Sent Events) transport.
     
     ElevenLabs uses SSE transport which requires a GET request to establish
     the connection. This endpoint handles the SSE handshake and responds to
     MCP protocol messages.
+    
+    Per MCP guidelines:
+    - Supports SSE transport for real-time bidirectional communication
+    - Handles connection lifecycle (establish, maintain, cleanup)
+    - Validates authorization if MCP_AUTH_REQUIRED is enabled
     """
+    # Validate authorization per MCP security guidelines
+    if not validate_mcp_authorization(authorization):
+        logger.warning(f"Unauthorized MCP GET request from {request.client.host if request.client else 'unknown'}")
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: Invalid or missing MCP authorization token"
+        )
+    
     # Log the incoming request for debugging
     logger.info(f"MCP GET (SSE) request from {request.client.host if request.client else 'unknown'}")
     logger.info(f"Query params: {dict(request.query_params)}")
@@ -134,10 +207,10 @@ async def mcp_endpoint_get(
                             "jsonrpc": "2.0",
                             "id": init_data.get("id"),
                             "result": {
-                                "protocolVersion": "2024-11-05",
+                                "protocolVersion": MCP_PROTOCOL_VERSION,
                                 "serverInfo": {
-                                    "name": "SupaGent Knowledge Base",
-                                    "version": "1.0.0"
+                                    "name": MCP_SERVER_NAME,
+                                    "version": MCP_SERVER_VERSION
                                 },
                                 "capabilities": {
                                     "tools": {}
@@ -214,17 +287,62 @@ async def mcp_endpoint(
     request: Request,
     request_body: Dict[str, Any],
     mcp: MCPDep = None,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> Dict[str, Any]:
-    """MCP protocol endpoint for ElevenLabs Agent.
+    """MCP protocol endpoint implementing Model Context Protocol.
     
-    Implements the MCP protocol for tool discovery and execution.
-    Supports both JSON-RPC format and direct method calls.
+    Implements the MCP protocol for tool discovery and execution following:
+    - JSON-RPC 2.0 specification for request/response format
+    - MCP protocol version 2024-11-05 (date-based versioning)
+    - Proper error codes per JSON-RPC spec (-32600 to -32700)
+    - Authorization validation per MCP security guidelines
+    
+    Supported Methods:
+    - initialize: Protocol handshake and capability negotiation
+    - tools/list: List available tools with schemas
+    - tools/call: Execute a tool with provided arguments
+    
+    Args:
+        request: FastAPI request object
+        request_body: JSON-RPC request body
+        mcp: MCP client dependency
+        authorization: Optional Authorization header (Bearer token)
+        
+    Returns:
+        JSON-RPC 2.0 formatted response
     """
-    # Log the incoming request for debugging
+    # LOG IMMEDIATELY - before any processing or authorization
     client_ip = request.client.host if request.client else "unknown"
-    logger.info(f"MCP POST request from {client_ip}")
-    logger.info(f"Request body: {json.dumps(request_body, indent=2)}")
-    logger.info(f"Headers: {dict(request.headers)}")
+    method_from_body = request_body.get("method") or request_body.get("jsonrpc_method", "UNKNOWN")
+    logger.info("=" * 80)
+    logger.info(f"🔥 MCP ENDPOINT HIT - POST /mcp")
+    logger.info(f"   Client IP: {client_ip}")
+    logger.info(f"   Method in body: {method_from_body}")
+    logger.info(f"   Request ID: {request_body.get('id', 'N/A')}")
+    logger.info(f"   Authorization header present: {authorization is not None}")
+    logger.info("=" * 80)
+    
+    # Validate authorization per MCP security guidelines
+    if not validate_mcp_authorization(authorization):
+        logger.warning(f"Unauthorized MCP POST request from {request.client.host if request.client else 'unknown'}")
+        return {
+            "jsonrpc": "2.0",
+            "id": request_body.get("id"),
+            "error": {
+                "code": -32000,
+                "message": "Unauthorized: Invalid or missing MCP authorization token"
+            }
+        }
+    
+    # Log the incoming request for debugging - AT THE VERY START
+    client_ip = request.client.host if request.client else "unknown"
+    logger.info("=" * 80)
+    logger.info(f"📥 MCP POST REQUEST RECEIVED from {client_ip}")
+    logger.info(f"   URL: {request.url}")
+    logger.info(f"   Method: {request.method}")
+    logger.info(f"   Request body: {json.dumps(request_body, indent=2)}")
+    logger.info(f"   Headers: {dict(request.headers)}")
+    logger.info("=" * 80)
     
     # Check for connection ID in header (if client sends it)
     connection_id_header = request.headers.get('X-Connection-ID')
@@ -236,7 +354,14 @@ async def mcp_endpoint(
     params = request_body.get("params", {})
     request_id = request_body.get("id")
     
-    logger.info(f"MCP method: {method}, request_id: {request_id}")
+    logger.info(f"🔍 MCP method: {method}, request_id: {request_id}")
+    
+    # Special logging for tool calls - log immediately when detected
+    if method == "tools/call":
+        tool_name = params.get("name", "UNKNOWN")
+        logger.info("🚨 TOOL CALL DETECTED IN REQUEST - Processing...")
+        logger.info(f"   Tool name: {tool_name}")
+        logger.info(f"   Arguments keys: {list(params.get('arguments', {}).keys())}")
     
     # Determine if this is a validation request BEFORE building response
     # Dashboard validation sends initialize/tools/list and expects immediate HTTP response
@@ -244,13 +369,38 @@ async def mcp_endpoint(
     is_validation_request = method in ["initialize", "tools/list"]
     logger.info(f"Request type: {'VALIDATION' if is_validation_request else 'TOOL_CALL'}, method={method}")
     
-    # Build response wrapper
+    # Build response wrapper following JSON-RPC 2.0 spec
     def make_response(result: Dict[str, Any], is_error: bool = False) -> Dict[str, Any]:
+        """
+        Create JSON-RPC 2.0 compliant response.
+        
+        Per JSON-RPC 2.0 spec:
+        - jsonrpc: Must be "2.0"
+        - id: Must match request id (or null for notifications)
+        - result: Present on success
+        - error: Present on failure (with code, message, optional data)
+        
+        Error codes per JSON-RPC spec:
+        - -32700: Parse error
+        - -32600: Invalid Request
+        - -32601: Method not found
+        - -32602: Invalid params
+        - -32603: Internal error
+        - -32000 to -32099: Server error (reserved)
+        """
         response = {"jsonrpc": "2.0"}
         if request_id is not None:
             response["id"] = request_id
         if is_error:
-            response["error"] = result
+            # Ensure error follows JSON-RPC 2.0 format
+            if isinstance(result, dict) and "code" in result:
+                response["error"] = result
+            else:
+                # Wrap non-standard errors
+                response["error"] = {
+                    "code": -32603,
+                    "message": str(result) if not isinstance(result, dict) else result.get("message", "Internal error")
+                }
         else:
             response["result"] = result
         return response
@@ -314,12 +464,13 @@ async def mcp_endpoint(
     
     if method == "initialize":
         # Handle initialize request - return server capabilities
+        # Per MCP spec: initialize establishes protocol version and server capabilities
         logger.info("Handling initialize request")
         response = make_response({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": MCP_PROTOCOL_VERSION,
             "serverInfo": {
-                "name": "SupaGent Knowledge Base",
-                "version": "1.0.0"
+                "name": MCP_SERVER_NAME,
+                "version": MCP_SERVER_VERSION
             },
             "capabilities": {
                 "tools": {}
@@ -402,10 +553,14 @@ async def mcp_endpoint(
             elif tool_name == "browser_screenshot":
                 tool_response = handle_browser_screenshot(request, arguments, make_response)
             else:
+                # Per JSON-RPC 2.0 spec: -32601 = Method not found
                 logger.warning(f"Unknown tool requested: {tool_name}")
                 tool_response = make_response({
                     "code": -32601,
-                    "message": f"Unknown tool: {tool_name}"
+                    "message": f"Unknown tool: {tool_name}",
+                    "data": {
+                        "available_tools": [tool["name"] for tool in _get_mcp_tools_list()]
+                    }
                 }, is_error=True)
             
             # Send response through SSE if available
@@ -417,6 +572,7 @@ async def mcp_endpoint(
             logger.warning(f"⚠️  TOOL COMPLETED: {tool_name} - No response generated")
             return tool_response
         except Exception as e:
+            # Per JSON-RPC 2.0 spec: -32603 = Internal error
             logger.error("=" * 80)
             logger.error(f"❌ TOOL ERROR: {tool_name}")
             logger.error(f"   Error: {str(e)}")
@@ -424,19 +580,38 @@ async def mcp_endpoint(
             logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
             error_response = make_response({
                 "code": -32603,
-                "message": f"Internal error executing tool: {str(e)}"
+                "message": f"Internal error executing tool: {str(e)}",
+                "data": {
+                    "tool": tool_name,
+                    "error_type": type(e).__name__
+                }
             }, is_error=True)
             return await send_response_via_sse_or_http(error_response)
     else:
+        # Per JSON-RPC 2.0 spec: -32601 = Method not found
         error_response = make_response({
             "code": -32601,
-            "message": f"Method not found: {method or 'unknown'}"
+            "message": f"Method not found: {method or 'unknown'}",
+            "data": {
+                "available_methods": ["initialize", "tools/list", "tools/call"]
+            }
         }, is_error=True)
         return await send_response_via_sse_or_http(error_response)
 
 
 def _get_mcp_tools_list() -> list:
-    """Get the list of MCP tools with their schemas."""
+    """
+    Get the list of MCP tools with their schemas.
+    
+    Per MCP guidelines:
+    - Tool names use snake_case format
+    - Each tool has name, description, and inputSchema
+    - inputSchema follows JSON Schema specification
+    - Required parameters are explicitly marked
+    
+    Returns:
+        List of tool definitions following MCP tool schema format
+    """
     return [
         {
             "name": "search_knowledge_base",
