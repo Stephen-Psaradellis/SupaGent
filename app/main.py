@@ -83,7 +83,12 @@ def build_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     # Mount MCP server using SDK's built-in Streamable HTTP transport
-    app.mount("/mcp", mcp_app, name="mcp")
+    app.mount("/mcp/", mcp_app, name="mcp")
+
+    # Health check endpoint
+    @app.get("/health")
+    def health_check():
+        return {"status": "healthy", "service": "SupaGent"}
 
     # Demo redirect
     @app.get("/demo")
