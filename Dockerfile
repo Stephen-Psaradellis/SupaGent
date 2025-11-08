@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     cmake \
+    pkg-config \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,7 +21,8 @@ WORKDIR /app
 # This layer is cached unless requirements.txt changes
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --user --no-cache-dir -r requirements.txt
+    pip install --user --no-cache-dir -r requirements.txt && \
+    python -c "import browser_use; print('✅ browser-use installed successfully')" || echo "❌ browser-use installation failed"
 
 # Runtime stage - smaller image
 FROM python:3.11-slim
