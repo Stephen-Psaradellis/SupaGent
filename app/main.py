@@ -6,9 +6,11 @@ All route handlers are organized in the app/routes/ directory.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import get_config
 from core.di import create_container
