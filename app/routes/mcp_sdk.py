@@ -749,6 +749,6 @@ async def browser_screenshot(
 
 
 
-# Export the server instance for integration with FastAPI
-__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN"]
+# Export the server instance and list_tools handler for integration with FastAPI
+__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN", "list_available_tools"]
 
