@@ -638,7 +638,7 @@ async def browser_navigate(
         def make_response(result: dict, is_error: bool = False) -> dict:
             return result
         
-        response = handle_browser_navigate(arguments, make_response)
+        response = await handle_browser_navigate(arguments, make_response)
         text = extract_text_from_mcp_response(response)
         
         return text
@@ -679,7 +679,7 @@ async def browser_interact(
         def make_response(result: dict, is_error: bool = False) -> dict:
             return result
         
-        response = handle_browser_interact(arguments, make_response)
+        response = await handle_browser_interact(arguments, make_response)
         text_result = extract_text_from_mcp_response(response)
         
         return text_result
@@ -717,7 +717,7 @@ async def browser_extract(
         def make_response(result: dict, is_error: bool = False) -> dict:
             return result
         
-        response = handle_browser_extract(arguments, make_response)
+        response = await handle_browser_extract(arguments, make_response)
         text = extract_text_from_mcp_response(response)
         
         return text
@@ -755,7 +755,7 @@ async def browser_screenshot(
         def make_response(result: dict, is_error: bool = False) -> dict:
             return result
         
-        response = handle_browser_screenshot(arguments, make_response)
+        response = await handle_browser_screenshot(arguments, make_response)
         text = extract_text_from_mcp_response(response)
         
         return text

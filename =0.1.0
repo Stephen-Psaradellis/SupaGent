@@ -1,0 +1,18 @@
+Collecting browser-use-sdk
+  Downloading browser_use_sdk-2.0.4-py3-none-any.whl.metadata (6.6 kB)
+Requirement already satisfied: httpx>=0.21.2 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from browser-use-sdk) (0.28.1)
+Requirement already satisfied: pydantic>=1.9.2 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from browser-use-sdk) (2.11.5)
+Requirement already satisfied: pydantic-core>=2.18.2 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from browser-use-sdk) (2.33.2)
+Requirement already satisfied: typing_extensions>=4.0.0 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from browser-use-sdk) (4.13.2)
+Requirement already satisfied: anyio in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from httpx>=0.21.2->browser-use-sdk) (4.9.0)
+Requirement already satisfied: certifi in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from httpx>=0.21.2->browser-use-sdk) (2025.4.26)
+Requirement already satisfied: httpcore==1.* in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from httpx>=0.21.2->browser-use-sdk) (1.0.9)
+Requirement already satisfied: idna in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from httpx>=0.21.2->browser-use-sdk) (3.10)
+Requirement already satisfied: h11>=0.16 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from httpcore==1.*->httpx>=0.21.2->browser-use-sdk) (0.16.0)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from pydantic>=1.9.2->browser-use-sdk) (0.7.0)
+Requirement already satisfied: typing-inspection>=0.4.0 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from pydantic>=1.9.2->browser-use-sdk) (0.4.0)
+Requirement already satisfied: exceptiongroup>=1.0.2 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from anyio->httpx>=0.21.2->browser-use-sdk) (1.2.2)
+Requirement already satisfied: sniffio>=1.1 in c:\users\snpsa\appdata\local\programs\python\python310\lib\site-packages (from anyio->httpx>=0.21.2->browser-use-sdk) (1.3.1)
+Downloading browser_use_sdk-2.0.4-py3-none-any.whl (79 kB)
+Installing collected packages: browser-use-sdk
+Successfully installed browser-use-sdk-2.0.4

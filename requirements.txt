@@ -43,7 +43,7 @@ google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.1
 
 # Browser automation
-browser-use-sdk>=0.1.0
+browser-use>=0.9.0  # Requires Python 3.11+
 playwright>=1.40.0
 
 # Development only (not needed in production)

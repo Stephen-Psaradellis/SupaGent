@@ -56,11 +56,13 @@ def handle_search_knowledge_base(
 
 def handle_create_ticket(
     crm: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle create_support_ticket tool call."""
     try:
+        crm = request.app.state.crm
         title = arguments.get("title", "")
         description = arguments.get("description", "")
         if not crm:
@@ -103,11 +105,13 @@ def handle_create_ticket(
 
 def handle_get_customer(
     crm: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle get_customer_info tool call."""
     try:
+        crm = request.app.state.crm
         identifier = arguments.get("identifier", "")
         if not crm:
             return make_response({
@@ -150,11 +154,13 @@ def handle_get_customer(
 
 def handle_escalate(
     escalations: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle escalate_to_human tool call."""
     try:
+        escalations = request.app.state.escalations
         session_id = arguments.get("session_id", "")
         reason = arguments.get("reason", "user_request")
         escalations.update_escalation(session_id, {"status": "escalated", "reason": reason})
@@ -180,11 +186,13 @@ def handle_escalate(
 
 def handle_log_interaction(
     crm: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle log_interaction tool call."""
     try:
+        crm = request.app.state.crm
         customer_id = arguments.get("customer_id", "")
         activity_type = arguments.get("activity_type", "")
         details = arguments.get("details", {})
@@ -229,7 +237,7 @@ def handle_log_interaction(
 
 
 def handle_check_order(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -258,7 +266,7 @@ def handle_check_order(
 
 
 def handle_check_availability(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -341,7 +349,7 @@ def handle_check_availability(
 
 
 def handle_get_user_bookings(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -421,7 +429,7 @@ def handle_get_user_bookings(
 
 
 def handle_book_appointment(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -517,7 +525,7 @@ def handle_book_appointment(
 
 
 def handle_modify_appointment(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -604,6 +612,7 @@ def handle_modify_appointment(
 
 
 def handle_cancel_appointment(
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -670,7 +679,7 @@ def handle_cancel_appointment(
 
 
 def handle_post_call_data(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -741,7 +750,7 @@ def handle_post_call_data(
 
 
 def handle_get_clients(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -811,7 +820,7 @@ def handle_get_clients(
 
 
 def handle_add_clients(
-    request: Any,
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -882,7 +891,8 @@ def handle_add_clients(
         }, is_error=True)
 
 
-def handle_browser_navigate(
+async def handle_browser_navigate(
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -900,17 +910,16 @@ def handle_browser_navigate(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         session_id = arguments.get("session_id", "default")
         wait_for = arguments.get("wait_for")
-        
-        import asyncio
-        result = asyncio.run(browser_service.navigate(
+
+        result = await browser_service.navigate(
             url=url,
             session_id=session_id,
             wait_for=wait_for,
-        ))
-        
+        )
+
         if result.get("status") == "error":
             return make_response({
                 "content": [
@@ -921,11 +930,11 @@ def handle_browser_navigate(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         response_text = f"✅ Navigated to {result.get('url', url)}\n"
         response_text += f"Title: {result.get('title', 'N/A')}\n"
         response_text += f"Session ID: {result.get('session_id', session_id)}"
-        
+
         return make_response({
             "content": [
                 {
@@ -946,8 +955,8 @@ def handle_browser_navigate(
         }, is_error=True)
 
 
-def handle_browser_interact(
-    request: Any,
+async def handle_browser_interact(
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -965,19 +974,18 @@ def handle_browser_interact(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         session_id = arguments.get("session_id", "default")
         selector = arguments.get("selector")
         text = arguments.get("text")
-        
-        import asyncio
-        result = asyncio.run(browser_service.interact(
+
+        result = await browser_service.interact(
             action=action,
             selector=selector,
             text=text,
             session_id=session_id,
-        ))
-        
+        )
+
         if result.get("status") == "error":
             return make_response({
                 "content": [
@@ -988,13 +996,13 @@ def handle_browser_interact(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         response_text = f"✅ Successfully performed {action}"
         if selector:
             response_text += f" on {selector}"
         if result.get("result"):
             response_text += f"\nResult: {result.get('result')}"
-        
+
         return make_response({
             "content": [
                 {
@@ -1015,8 +1023,8 @@ def handle_browser_interact(
         }, is_error=True)
 
 
-def handle_browser_extract(
-    request: Any,
+async def handle_browser_extract(
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -1026,14 +1034,13 @@ def handle_browser_extract(
         extract_type = arguments.get("extract_type", "all")
         selector = arguments.get("selector")
         session_id = arguments.get("session_id", "default")
-        
-        import asyncio
-        result = asyncio.run(browser_service.extract(
+
+        result = await browser_service.extract(
             extract_type=extract_type,
             selector=selector,
             session_id=session_id,
-        ))
-        
+        )
+
         if result.get("status") == "error":
             return make_response({
                 "content": [
@@ -1044,10 +1051,10 @@ def handle_browser_extract(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         extracted = result.get("extracted", {})
         response_text = f"✅ Extracted {extract_type} data:\n\n"
-        
+
         if "title" in extracted:
             response_text += f"Title: {extracted['title']}\n"
         if "url" in extracted:
@@ -1067,7 +1074,7 @@ def handle_browser_extract(
             response_text += f"Metadata: {len(metadata)} items\n"
             for key, value in list(metadata.items())[:5]:
                 response_text += f"  {key}: {value}\n"
-        
+
         return make_response({
             "content": [
                 {
@@ -1088,8 +1095,8 @@ def handle_browser_extract(
         }, is_error=True)
 
 
-def handle_browser_screenshot(
-    request: Any,
+async def handle_browser_screenshot(
+
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -1099,14 +1106,13 @@ def handle_browser_screenshot(
         session_id = arguments.get("session_id", "default")
         full_page = arguments.get("full_page", False)
         selector = arguments.get("selector")
-        
-        import asyncio
-        result = asyncio.run(browser_service.screenshot(
+
+        result = await browser_service.screenshot(
             session_id=session_id,
             full_page=full_page,
             selector=selector,
-        ))
-        
+        )
+
         if result.get("status") == "error":
             return make_response({
                 "content": [
@@ -1117,15 +1123,15 @@ def handle_browser_screenshot(
                 ],
                 "isError": True
             }, is_error=True)
-        
+
         screenshot_path = result.get("screenshot_path", "")
         screenshot_url = result.get("screenshot_url", "")
-        
+
         response_text = f"✅ Screenshot captured successfully\n"
         response_text += f"Path: {screenshot_path}\n"
         if screenshot_url:
             response_text += f"URL: {screenshot_url}"
-        
+
         return make_response({
             "content": [
                 {
