@@ -55,13 +55,12 @@ def handle_search_knowledge_base(
 
 
 def handle_create_ticket(
-    request: Any,
+    crm: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle create_support_ticket tool call."""
     try:
-        crm = request.app.state.crm
         title = arguments.get("title", "")
         description = arguments.get("description", "")
         if not crm:
@@ -103,13 +102,12 @@ def handle_create_ticket(
 
 
 def handle_get_customer(
-    request: Any,
+    crm: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle get_customer_info tool call."""
     try:
-        crm = request.app.state.crm
         identifier = arguments.get("identifier", "")
         if not crm:
             return make_response({
@@ -151,13 +149,12 @@ def handle_get_customer(
 
 
 def handle_escalate(
-    request: Any,
+    escalations: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle escalate_to_human tool call."""
     try:
-        escalations = request.app.state.escalations
         session_id = arguments.get("session_id", "")
         reason = arguments.get("reason", "user_request")
         escalations.update_escalation(session_id, {"status": "escalated", "reason": reason})
@@ -182,13 +179,12 @@ def handle_escalate(
 
 
 def handle_log_interaction(
-    request: Any,
+    crm: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Handle log_interaction tool call."""
     try:
-        crm = request.app.state.crm
         customer_id = arguments.get("customer_id", "")
         activity_type = arguments.get("activity_type", "")
         details = arguments.get("details", {})
@@ -608,7 +604,6 @@ def handle_modify_appointment(
 
 
 def handle_cancel_appointment(
-    request: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -888,7 +883,6 @@ def handle_add_clients(
 
 
 def handle_browser_navigate(
-    request: Any,
     arguments: Dict[str, Any],
     make_response: Callable[[Dict[str, Any], bool], Dict[str, Any]],
 ) -> Dict[str, Any]:
