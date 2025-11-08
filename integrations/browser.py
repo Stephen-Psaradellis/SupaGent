@@ -38,23 +38,13 @@ try:
     from browser_use import Agent, Browser, BrowserConfig
     BROWSER_USE_AVAILABLE = True
     logger.info("✅ Browser-use package available - AI-powered automation enabled")
-except ImportError:
-    # Try legacy browser-use-sdk API
-    try:
-        from browser_use_sdk import BrowserUse as Agent, BrowserUse as Browser
-        # Create a simple BrowserConfig class for compatibility
-        class BrowserConfig:
-            def __init__(self, headless=True, **kwargs):
-                self.headless = headless
-        BROWSER_USE_AVAILABLE = True
-        logger.info("✅ Browser-use-sdk package available - basic automation enabled")
-    except ImportError:
-        logger.warning(
-            "Browser-use package not available. Browser automation will use "
-            "Playwright directly without AI-powered features. "
-            "To enable advanced features, upgrade to Python 3.11+ and install browser-use>=0.9.0"
-        )
-        BROWSER_USE_AVAILABLE = False
+except ImportError as e:
+    logger.warning(
+        f"Browser-use package not available (import error: {e}). Browser automation will use "
+        "Playwright directly without AI-powered features. "
+        "To enable advanced features, ensure Python 3.11+ and browser-use==0.9.5 are installed."
+    )
+    BROWSER_USE_AVAILABLE = False
 
 
 class BrowserSession:
