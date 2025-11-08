@@ -2,6 +2,9 @@
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
+# Model Context Protocol SDK
+mcp>=1.1.0
+
 # LangChain ecosystem
 langchain>=0.1.0
 langchain-core>=0.1.0
