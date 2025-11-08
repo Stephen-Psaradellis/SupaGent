@@ -131,8 +131,13 @@ async def create_support_ticket(
         Ticket creation confirmation with ticket ID
     """
     try:
-        from app.main import app
-        crm = app.state.crm
+        # Get crm service from dependency injection
+
+        from core.di import get_container
+
+        container = get_container()
+
+        crm = container.get("crm")
 
         arguments = {
             "title": title,
@@ -166,8 +171,13 @@ async def get_customer_info(
         Customer information including ID, name, email, and account status
     """
     try:
-        from app.main import app
-        crm = app.state.crm
+        # Get crm service from dependency injection
+
+        from core.di import get_container
+
+        container = get_container()
+
+        crm = container.get("crm")
         
         arguments = {"identifier": identifier}
         
@@ -203,8 +213,13 @@ async def escalate_to_human(
         Escalation confirmation
     """
     try:
-        from app.main import app
-        escalations = app.state.escalations
+        # Get escalations service from dependency injection
+
+        from core.di import get_container
+
+        container = get_container()
+
+        escalations = container.get("escalations")
         
         arguments = {
             "session_id": session_id,
@@ -243,8 +258,13 @@ async def log_interaction(
         Logging confirmation
     """
     try:
-        from app.main import app
-        crm = app.state.crm
+        # Get crm service from dependency injection
+
+        from core.di import get_container
+
+        container = get_container()
+
+        crm = container.get("crm")
         
         arguments = {
             "customer_id": customer_id,
@@ -749,6 +769,6 @@ async def browser_screenshot(
 
 
 
-# Export the server instance and list_tools handler for integration with FastAPI
-__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN", "list_available_tools"]
+# Export the server instance for integration with FastAPI
+__all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN"]
 
