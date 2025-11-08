@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import logging
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import get_config
 from core.di import create_container
 from core.http_client import HTTPClientManager
 from app.setup import setup_elevenlabs_mcp_server, setup_elevenlabs_agent
 from app.routes import register_routes
+from app.routes.mcp_sdk_router import mcp_app
 
 
 def build_app() -> FastAPI:
@@ -80,7 +81,10 @@ def build_app() -> FastAPI:
     
     # Static files
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
-    
+
+    # Mount MCP server using SDK's built-in Streamable HTTP transport
+    app.mount("/mcp", mcp_app, name="mcp")
+
     # Demo redirect
     @app.get("/demo")
     def demo_redirect():
