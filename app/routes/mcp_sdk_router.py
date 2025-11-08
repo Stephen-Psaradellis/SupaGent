@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from mcp import types
 
-from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN
+from app.routes.mcp_sdk import server, MCP_AUTH_REQUIRED, MCP_AUTH_TOKEN, list_available_tools
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +106,7 @@ async def mcp_sse(
 
             # Get and send tools list
             try:
-                import asyncio
-                tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
-                tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
+                tools = await list_available_tools()
 
                 tools_msg = {
                     "jsonrpc": "2.0",
@@ -121,6 +119,15 @@ async def mcp_sse(
                 logger.info(f"📤 Sent tools list via SSE ({len(tools)} tools)")
             except Exception as e:
                 logger.error(f"Error sending tools list via SSE: {e}", exc_info=True)
+                # Send error notification
+                error_msg = {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/tools/list_changed",
+                    "params": {
+                        "tools": []
+                    }
+                }
+                yield f"data: {json.dumps(error_msg)}\n\n"
 
             # Keep connection alive with periodic keepalives
             keepalive_count = 0
