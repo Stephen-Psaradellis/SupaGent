@@ -789,6 +789,442 @@ async def set_logging_level(level: types.LoggingLevel) -> types.EmptyResult:
     return types.EmptyResult()
 
 
+# ============================================================================
+# TOOL DEFINITIONS AND LIST_TOOLS HANDLER
+# ============================================================================
+
+# Define all available tools with their schemas
+TOOL_DEFINITIONS = [
+    {
+        "name": "search_knowledge_base",
+        "description": "Search the customer support knowledge base to find relevant documentation, FAQs, and troubleshooting guides. Use this tool when you need to answer questions about products, services, policies, or procedures.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to find relevant information in the knowledge base"
+                },
+                "k": {
+                    "type": "integer",
+                    "description": "Number of results to return (default: 4, max: 10)",
+                    "default": 4
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "create_support_ticket",
+        "description": "Create a support ticket in the CRM system when an issue cannot be resolved through the knowledge base or requires human intervention.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Brief title summarizing the issue"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Detailed description of the issue"
+                },
+                "customer_id": {
+                    "type": "string",
+                    "description": "Customer ID if available"
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "Priority level (low, normal, high, urgent)",
+                    "default": "normal"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional tags for categorization"
+                }
+            },
+            "required": ["title", "description"]
+        }
+    },
+    {
+        "name": "get_customer_info",
+        "description": "Retrieve customer information from the CRM system including account details, order history, and previous interactions.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "description": "Customer identifier (customer_id, email, or phone)"
+                }
+            },
+            "required": ["identifier"]
+        }
+    },
+    {
+        "name": "escalate_to_human",
+        "description": "Escalate the conversation to a human support agent when needed.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Current conversation session ID"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for escalation"
+                },
+                "customer_id": {
+                    "type": "string",
+                    "description": "Customer ID if available"
+                },
+                "conversation_summary": {
+                    "type": "string",
+                    "description": "Brief summary of conversation"
+                }
+            },
+            "required": ["session_id"]
+        }
+    },
+    {
+        "name": "log_interaction",
+        "description": "Log a customer interaction in the CRM system for analytics, compliance, and future reference.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string",
+                    "description": "Customer ID"
+                },
+                "activity_type": {
+                    "type": "string",
+                    "description": "Type of activity"
+                },
+                "details": {
+                    "type": "object",
+                    "description": "Additional details as JSON object"
+                }
+            },
+            "required": ["customer_id", "activity_type", "details"]
+        }
+    },
+    {
+        "name": "check_order_status",
+        "description": "Check the status of a customer order including shipping information and estimated delivery date.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "order_id": {
+                    "type": "string",
+                    "description": "Order ID or order number"
+                },
+                "customer_id": {
+                    "type": "string",
+                    "description": "Customer ID for verification"
+                }
+            },
+            "required": ["order_id"]
+        }
+    },
+    {
+        "name": "check_availability",
+        "description": "Check calendar availability for a time range. Returns available time slots and existing events.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "time_min": {
+                    "type": "string",
+                    "description": "Start time for availability check (ISO 8601 format, optional, defaults to now)"
+                },
+                "time_max": {
+                    "type": "string",
+                    "description": "End time for availability check (ISO 8601 format, optional, defaults to now + 7 days)"
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Minimum duration needed for availability in minutes (default: 30)",
+                    "default": 30
+                }
+            }
+        }
+    },
+    {
+        "name": "get_user_bookings",
+        "description": "Get user's calendar bookings/appointments for a specified time range.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "time_min": {
+                    "type": "string",
+                    "description": "Start time for query (ISO 8601 format, optional, defaults to now)"
+                },
+                "time_max": {
+                    "type": "string",
+                    "description": "End time for query (ISO 8601 format, optional, defaults to now + 30 days)"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (default: 50)",
+                    "default": 50
+                }
+            }
+        }
+    },
+    {
+        "name": "book_appointment",
+        "description": "Create a new appointment/event in the calendar.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "Event title/summary"
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "Start time of the appointment (ISO 8601 format)"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "End time of the appointment (ISO 8601 format)"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description of the appointment"
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Optional location"
+                },
+                "attendees": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of attendee email addresses"
+                }
+            },
+            "required": ["summary", "start_time", "end_time"]
+        }
+    },
+    {
+        "name": "modify_appointment",
+        "description": "Update an existing appointment/event in the calendar.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "ID of the event to update"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "New summary/title (optional)"
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "New start time (ISO 8601 format, optional)"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "New end time (ISO 8601 format, optional)"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "New description (optional)"
+                },
+                "location": {
+                    "type": "string",
+                    "description": "New location (optional)"
+                },
+                "attendees": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "New list of attendees (optional)"
+                }
+            },
+            "required": ["event_id"]
+        }
+    },
+    {
+        "name": "cancel_appointment",
+        "description": "Cancel/delete an appointment/event from the calendar.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "ID of the event to cancel"
+                }
+            },
+            "required": ["event_id"]
+        }
+    },
+    {
+        "name": "post_call_data",
+        "description": "Post call/interaction data to Google Sheets for logging and analytics.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "call_data": {
+                    "type": "object",
+                    "description": "Object containing call information (e.g., customer_id, duration, outcome, notes)"
+                },
+                "sheet_name": {
+                    "type": "string",
+                    "description": "Name of the sheet tab (optional, defaults to 'Calls')"
+                }
+            },
+            "required": ["call_data"]
+        }
+    },
+    {
+        "name": "get_clients",
+        "description": "Get client data from Google Sheets.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sheet_name": {
+                    "type": "string",
+                    "description": "Name of the sheet tab (optional, defaults to first sheet)"
+                },
+                "range_name": {
+                    "type": "string",
+                    "description": "A1 notation range (e.g., 'A1:D10') or leave empty for all data"
+                }
+            }
+        }
+    },
+    {
+        "name": "add_clients",
+        "description": "Add client data to Google Sheets.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "clients": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Array of client objects to add"
+                },
+                "sheet_name": {
+                    "type": "string",
+                    "description": "Name of the sheet tab (optional, defaults to first sheet)"
+                }
+            },
+            "required": ["clients"]
+        }
+    },
+    {
+        "name": "browser_navigate",
+        "description": "Navigate to a URL in the browser. Opens and renders web pages with full JavaScript support. Maintains session context for multi-step workflows.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to navigate to"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Browser session ID for maintaining context (defaults to 'default')",
+                    "default": "default"
+                },
+                "wait_for": {
+                    "type": "string",
+                    "description": "Optional CSS selector or text to wait for after navigation"
+                }
+            },
+            "required": ["url"]
+        }
+    },
+    {
+        "name": "browser_interact",
+        "description": "Perform intelligent interactions on the web page (clicking, typing, submitting forms, scrolling, waiting for elements). Uses BrowserUse's autonomous control for smart element detection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Action to perform (click, type, submit, scroll, wait)"
+                },
+                "selector": {
+                    "type": "string",
+                    "description": "CSS selector, text, or description to identify the element"
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Text to type (required for 'type' action)"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Browser session ID (defaults to 'default')",
+                    "default": "default"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "browser_extract",
+        "description": "Extract structured data from the current page such as titles, text, links, and metadata. Can extract from the entire page or a specific element.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "extract_type": {
+                    "type": "string",
+                    "description": "Type of data to extract (all, title, text, links, metadata)",
+                    "default": "all"
+                },
+                "selector": {
+                    "type": "string",
+                    "description": "Optional CSS selector to limit extraction to a specific element"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Browser session ID (defaults to 'default')",
+                    "default": "default"
+                }
+            }
+        }
+    },
+    {
+        "name": "browser_screenshot",
+        "description": "Capture a screenshot of the current page or a specific element. Useful for visual verification or debugging.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "string",
+                    "description": "Browser session ID (defaults to 'default')",
+                    "default": "default"
+                },
+                "full_page": {
+                    "type": "boolean",
+                    "description": "Whether to capture the full scrollable page (default: false)",
+                    "default": False
+                },
+                "selector": {
+                    "type": "string",
+                    "description": "Optional CSS selector to screenshot a specific element"
+                }
+            }
+        }
+    }
+]
+
+
+@server.list_tools()
+async def list_available_tools() -> list[types.Tool]:
+    """Return all available tools for the MCP server."""
+    tools = []
+    for tool_def in TOOL_DEFINITIONS:
+        tool = types.Tool(
+            name=tool_def["name"],
+            description=tool_def["description"],
+            inputSchema=tool_def["inputSchema"]
+        )
+        tools.append(tool)
+    return tools
+
+
 # Export the server instance for integration with FastAPI
 __all__ = ["server", "MCP_AUTH_REQUIRED", "MCP_AUTH_TOKEN"]
 

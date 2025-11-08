@@ -172,65 +172,32 @@ async def mcp_endpoint(
             
         elif method == "tools/list":
             logger.info("Handling tools/list request via SDK")
-            
-            # Get tools from the SDK server
-            tools = []
-            for tool_name, tool_func in server._tool_handlers.items():
-                import inspect
-                sig = inspect.signature(tool_func)
-                
-                properties = {}
-                required = []
-                
-                for param_name, param in sig.parameters.items():
-                    param_type = param.annotation
-                    
-                    if param_type == str:
-                        properties[param_name] = {"type": "string"}
-                    elif param_type == int:
-                        properties[param_name] = {"type": "integer"}
-                    elif param_type == bool:
-                        properties[param_name] = {"type": "boolean"}
-                    elif param_type == float:
-                        properties[param_name] = {"type": "number"}
-                    elif hasattr(param_type, "__origin__"):
-                        origin = param_type.__origin__
-                        if origin is list:
-                            properties[param_name] = {"type": "array"}
-                        elif origin is dict:
-                            properties[param_name] = {"type": "object"}
-                    else:
-                        properties[param_name] = {"type": "string"}
-                    
-                    if tool_func.__doc__:
-                        properties[param_name]["description"] = f"Parameter: {param_name}"
-                    
-                    if param.default == inspect.Parameter.empty and not (
-                        hasattr(param_type, "__origin__") and 
-                        param_type.__origin__ is type(Optional)
-                    ):
-                        required.append(param_name)
-                
-                tool_schema = {
-                    "name": tool_name,
-                    "description": tool_func.__doc__ or f"Tool: {tool_name}",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required
+
+            # Get tools from the SDK server's list_tools handler
+            try:
+                import asyncio
+                tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
+                tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
+
+                logger.info(f"Returning {len(tools)} tools from SDK")
+
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "tools": [tool.model_dump() for tool in tools]
                     }
                 }
-                tools.append(tool_schema)
-            
-            logger.info(f"Returning {len(tools)} tools from SDK")
-            
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "tools": tools
+            except Exception as e:
+                logger.error(f"Error getting tools list: {e}", exc_info=True)
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32603,
+                        "message": f"Internal error listing tools: {str(e)}"
+                    }
                 }
-            }
             
         elif method == "tools/call":
             tool_name = request_body.get("params", {}).get("name")
@@ -302,10 +269,21 @@ async def mcp_endpoint(
 @router.get("/health")
 async def mcp_health() -> dict[str, Any]:
     """Health check endpoint for MCP server."""
+    try:
+        import asyncio
+        tools_result = asyncio.run(server.request_handlers[types.ListToolsRequest](None))
+        tools = tools_result.root.tools if hasattr(tools_result, 'root') and hasattr(tools_result.root, 'tools') else []
+        tool_count = len(tools)
+        tool_names = [tool.name for tool in tools]
+    except Exception as e:
+        logger.error(f"Error getting tools for health check: {e}")
+        tool_count = 0
+        tool_names = []
+
     return {
         "status": "healthy",
         "server_name": server.name,
         "sdk_version": "official",
-        "tool_count": len(server._tool_handlers),
-        "tools": list(server._tool_handlers.keys())
+        "tool_count": tool_count,
+        "tools": tool_names
     }
