@@ -31,11 +31,10 @@ logger = logging.getLogger(__name__)
 BROWSER_USE_AVAILABLE = False
 Agent = None
 Browser = None
-BrowserConfig = None
 
 # Try modern browser-use API (Python 3.11+ required)
 try:
-    from browser_use import Agent, Browser, BrowserConfig
+    from browser_use import Agent, Browser
     BROWSER_USE_AVAILABLE = True
     logger.info("✅ Browser-use package available - AI-powered automation enabled")
 except ImportError as e:
@@ -144,12 +143,11 @@ class BrowserService:
             self.screenshot_dir = Path("./data/screenshots")
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
         
-        # Browser configuration
-        if BROWSER_USE_AVAILABLE and BrowserConfig:
-            self._browser_config = BrowserConfig(
-                headless=headless,
-                disable_security=True,  # Disable security for automation
-            )
+        # Browser configuration - store parameters for BrowserSession
+        if BROWSER_USE_AVAILABLE:
+            self._browser_config = {
+                'headless': headless,
+            }
         else:
             self._browser_config = None
             self._playwright = None
@@ -238,50 +236,41 @@ class BrowserService:
         logger.info(f"Creating new browser session: {session_id}")
         
         if BROWSER_USE_AVAILABLE and Browser:
-            browser = Browser(config=self._browser_config)
+            browser = Browser(**self._browser_config)
             session = BrowserSession(session_id, browser)
             session.browser = browser
             
             # Initialize browser and get page
             await browser.start()
             session.page = await browser.new_page()
-            if Agent and self.openai_api_key:
-                # Create Agent with OpenAI configuration
-                agent_kwargs = {
-                    "task": "Navigate and interact with web pages",
-                    "browser": browser,
-                }
-                
-                # Try to pass OpenAI configuration - BrowserUse may accept different parameter names
-                # Common patterns: llm, model, api_key, openai_api_key, etc.
+            if Agent:
                 try:
-                    # Try with llm parameter (common pattern)
-                    from langchain_openai import ChatOpenAI
-                    llm = ChatOpenAI(
-                        model=self.openai_model,
-                        api_key=self.openai_api_key,
-                        temperature=0,
-                    )
-                    agent_kwargs["llm"] = llm
-                except (ImportError, Exception) as e:
-                    logger.debug(f"Could not use langchain_openai for LLM: {e}")
-                    # Fallback: try direct parameters
-                    try:
-                        agent_kwargs["model"] = self.openai_model
-                        agent_kwargs["api_key"] = self.openai_api_key
-                    except Exception:
-                        # Try alternative parameter names
-                        agent_kwargs["openai_api_key"] = self.openai_api_key
-                        agent_kwargs["openai_model"] = self.openai_model
-                
-                session.agent = Agent(**agent_kwargs)
-                logger.info(f"Created BrowserUse Agent with model: {self.openai_model}")
-            elif Agent:
-                logger.warning("BrowserUse Agent created without OpenAI API key - limited functionality")
-                session.agent = Agent(
-                    task="Navigate and interact with web pages",
-                    browser=browser,
-                )
+                    # Create Agent with browser
+                    agent_kwargs = {
+                        "task": "Navigate and interact with web pages",
+                        "browser": browser,
+                    }
+
+                    # Add LLM if OpenAI API key is available
+                    if self.openai_api_key:
+                        try:
+                            from langchain_openai import ChatOpenAI
+                            llm = ChatOpenAI(
+                                model=self.openai_model,
+                                api_key=self.openai_api_key,
+                                temperature=0,
+                            )
+                            agent_kwargs["llm"] = llm
+                            logger.info(f"Created BrowserUse Agent with LLM: {self.openai_model}")
+                        except ImportError as e:
+                            logger.warning(f"Could not import langchain_openai: {e}")
+                    else:
+                        logger.warning("BrowserUse Agent created without OpenAI API key - limited functionality")
+
+                    session.agent = Agent(**agent_kwargs)
+                except Exception as e:
+                    logger.error(f"Failed to create BrowserUse Agent: {e}")
+                    session.agent = None
         else:
             # Fallback to Playwright directly
             if self._playwright is None:
@@ -436,6 +425,7 @@ class BrowserService:
             
             # Use BrowserUse agent for intelligent interactions
             if session.agent:
+                # Create task description for the agent
                 if action == "click":
                     task = f"Click on the element: {selector}"
                 elif action == "type":
@@ -448,15 +438,40 @@ class BrowserService:
                     task = f"Wait for the element: {selector} to appear"
                 else:
                     task = f"Perform {action} on {selector}"
-                
-                result = await session.agent.run(task)
-                
-                return {
-                    "status": "success",
-                    "action": action,
-                    "result": result,
-                    "session_id": session_id,
-                }
+
+                try:
+                    # Create a new agent instance for this specific task
+                    agent_kwargs = {
+                        "task": task,
+                        "browser": session.browser,
+                    }
+
+                    # Add LLM if available
+                    if self.openai_api_key:
+                        try:
+                            from langchain_openai import ChatOpenAI
+                            llm = ChatOpenAI(
+                                model=self.openai_model,
+                                api_key=self.openai_api_key,
+                                temperature=0,
+                            )
+                            agent_kwargs["llm"] = llm
+                        except ImportError:
+                            pass
+
+                    # Create agent and run task
+                    agent = Agent(**agent_kwargs)
+                    result = await agent.run(max_steps=5)
+
+                    return {
+                        "status": "success",
+                        "action": action,
+                        "result": "Task completed successfully" if result else "Task completed",
+                        "session_id": session_id,
+                    }
+                except Exception as e:
+                    logger.error(f"BrowserUse agent failed: {e}")
+                    # Fall through to Playwright fallback
             else:
                 # Fallback to direct Playwright if agent not available
                 page = session.page
