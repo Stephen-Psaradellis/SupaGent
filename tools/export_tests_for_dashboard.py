@@ -26,7 +26,7 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default="elevenlabs_tests.json",
+        default="test_scenarios.json",
         help="Output file path",
     )
     parser.add_argument(
