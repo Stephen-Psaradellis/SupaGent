@@ -25,6 +25,74 @@ def create_mcp_app():
     # Configure the server for SSE transport
     mcp_app = server.sse_app()
 
+    # Also create a synchronous HTTP endpoint for ElevenLabs compatibility
+    from fastapi import APIRouter, HTTPException
+    from fastapi.responses import JSONResponse
+    import json
+
+    sync_router = APIRouter()
+
+    @sync_router.post("/tools/list")
+    async def sync_tools_list():
+        """Synchronous endpoint for ElevenLabs tool discovery."""
+        try:
+            tools = await server.list_tools()
+            tool_list = []
+            for tool in tools:
+                tool_list.append({
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
+                })
+
+            return {
+                "jsonrpc": "2.0",
+                "id": None,  # ElevenLabs doesn't send an ID
+                "result": {
+                    "tools": tool_list
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error in sync tools list: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Mount the sync router
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class SyncMCPMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            # Intercept requests to /mcp/tools/list and route to sync endpoint
+            if request.url.path == "/mcp/tools/list":
+                # Parse JSON body
+                try:
+                    body = await request.json()
+                    if body.get("method") == "tools/list":
+                        # Return sync response
+                        tools = await server.list_tools()
+                        tool_list = []
+                        for tool in tools:
+                            tool_list.append({
+                                "name": tool.name,
+                                "description": tool.description or "",
+                                "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
+                            })
+
+                        return JSONResponse({
+                            "jsonrpc": "2.0",
+                            "id": body.get("id"),
+                            "result": {
+                                "tools": tool_list
+                            }
+                        })
+                except Exception as e:
+                    logger.error(f"Error in sync middleware: {e}")
+                    pass
+
+            return await call_next(request)
+
+    # Wrap the app with sync middleware
+    mcp_app = SyncMCPMiddleware(mcp_app)
+
     # Add authentication middleware if required
     if MCP_AUTH_REQUIRED and MCP_AUTH_TOKEN:
 
