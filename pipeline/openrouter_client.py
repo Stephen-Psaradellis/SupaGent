@@ -699,11 +699,11 @@ Generate the email now:"""
                 return content
             else:
                 logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
-                raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
+                return '{"error": "API call failed", "subject": "AI-Powered Customer Service Solution", "body": "We offer personalized AI voice agents for your business. Contact us to learn more.", "key_personalizations": [], "value_propositions_used": [], "confidence_score": "Low"}'
 
         except Exception as e:
             logger.error(f"OpenRouter API request failed: {e}")
-            raise Exception(f"OpenRouter API request failed: {str(e)}")
+            return '{"error": "Request failed", "subject": "AI-Powered Customer Service Solution", "body": "We offer personalized AI voice agents for your business. Contact us to learn more.", "key_personalizations": [], "value_propositions_used": [], "confidence_score": "Low"}'
 
     def _parse_email_response(self, response: str, business: BusinessContext) -> Dict[str, str]:
         """Parse the LLM response into structured email template.

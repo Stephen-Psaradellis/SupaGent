@@ -262,16 +262,10 @@ Best regards,
         }
 
         # Generate email with LLM
-        try:
-            llm_template = self.llm_client.generate_email_template(
-                business_context, agent_context, sender_info
-            )
-        except Exception as e:
-            logger.warning(f"LLM email generation failed: {e}. Falling back to template.")
-            return self._compose_email_with_templates(
-                business_name, domain, industry, recipient_email,
-                recipient_name, voice_agent_url, content_summary
-            )
+
+        llm_template = self.llm_client.generate_email_template(
+            business_context, agent_context, sender_info
+        )
 
         # Convert to EmailTemplate format
         template = EmailTemplate(
