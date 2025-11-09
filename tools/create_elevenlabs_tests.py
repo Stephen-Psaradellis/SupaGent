@@ -22,18 +22,18 @@ def main():
     parser = argparse.ArgumentParser(description="Create test suites in ElevenLabs dashboard")
     parser.add_argument(
         "--suite",
-        choices=["comprehensive", "tool-invocation"],
+        choices=["comprehensive", "tool-awareness"],
         default="comprehensive",
         help="Test suite to create",
     )
     parser.add_argument(
         "--name",
-        default="SupaGent Comprehensive Test Suite",
+        default="SupaGent Tool Awareness & System Integration Suite",
         help="Name for the test suite",
     )
     parser.add_argument(
         "--description",
-        default="Comprehensive test suite with 10 scenarios covering password reset, account recovery, support queries, and more.",
+        default="Test suite verifying agent tool awareness and system tool integration. MCP tools cannot be tested for invocation in ElevenLabs.",
         help="Description for the test suite",
     )
     args = parser.parse_args()
@@ -62,7 +62,7 @@ def main():
     if args.suite == "comprehensive":
         from agents.test_suites import get_comprehensive_test_suite
         scenarios = get_comprehensive_test_suite()
-    elif args.suite == "tool-invocation":
+    elif args.suite == "tool-awareness":
         from agents.test_suites import get_tool_invocation_test_suite
         scenarios = get_tool_invocation_test_suite()
     else:

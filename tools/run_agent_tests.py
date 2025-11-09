@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run agent tests")
     parser.add_argument(
         "--suite",
-        choices=["comprehensive", "focused", "default"],
+        choices=["comprehensive", "focused", "default", "tool-awareness"],
         default="comprehensive",
         help="Test suite to run",
     )
@@ -38,6 +38,9 @@ def main():
         scenarios = get_comprehensive_test_suite()
     elif args.suite == "focused":
         scenarios = get_focused_test_suite()
+    elif args.suite == "tool-awareness":
+        from agents.test_suites import get_tool_invocation_test_suite
+        scenarios = get_tool_invocation_test_suite()
     else:
         scenarios = create_default_test_suite()
 
@@ -50,16 +53,122 @@ def main():
     except RuntimeError as e:
         print(f"Warning: {e}", file=sys.stderr)
         print("Running tests locally (without ElevenLabs API)...", file=sys.stderr)
-    
+
     # Run tests
     if tester:
-        # Try to run via API, fallback to local
+        # Create tests in ElevenLabs first, then run them
         try:
-            results = tester.run_tests(scenarios=scenarios)
+            print("Creating tests in ElevenLabs dashboard...", file=sys.stderr)
+            created_tests = tester.create_tests_from_scenarios(scenarios)
+            successful_tests = [t for t in created_tests if "test_id" in t]
+
+            if not successful_tests:
+                print("No tests were successfully created in ElevenLabs", file=sys.stderr)
+                results = []
+            else:
+                test_ids = [t["test_id"] for t in successful_tests]
+                print(f"Running {len(test_ids)} tests via ElevenLabs API...", file=sys.stderr)
+                run_result = tester.run_tests(test_ids)
+                # Convert ElevenLabs result format to our expected format
+                results = []
+                if "tests" in run_result:
+                    for test in run_result["tests"]:
+                        results.append(TestResult(
+                            test_id=test.get("test_id", ""),
+                            scenario_name=test.get("name", ""),
+                            passed=test.get("passed", False),
+                            details=test.get("details", {}),
+                            tool_calls=test.get("tool_calls", []),
+                            response=test.get("response", ""),
+                            error=test.get("error", ""),
+                        ))
+                else:
+                    print(f"Unexpected ElevenLabs API response: {run_result}", file=sys.stderr)
+                    results = []
         except Exception as e:
-            print(f"API test execution failed: {e}", file=sys.stderr)
+            print(f"ElevenLabs API test execution failed: {e}", file=sys.stderr)
             print("Falling back to local test execution...", file=sys.stderr)
-            results = tester._run_tests_locally(scenarios)
+            # Local fallback
+            from memory.mcp_client import MCPClient
+            from memory.vector_store import VectorStore
+            from agents.rag import RAGAnswerer
+
+            store = VectorStore()
+            mcp = MCPClient(store.similarity_search)
+            rag = RAGAnswerer(mcp)
+
+            results = []
+            for i, scenario in enumerate(scenarios):
+                test_id = f"test_{i}_{scenario.name}"
+                try:
+                    user_messages = [
+                        msg["content"] for msg in scenario.messages
+                        if msg.get("role") == "user"
+                    ]
+
+                    if not user_messages:
+                        results.append(TestResult(
+                            test_id=test_id,
+                            scenario_name=scenario.name,
+                            passed=False,
+                            details={},
+                            tool_calls=[],
+                            error="No user messages in scenario",
+                        ))
+                        continue
+
+                    last_user_message = user_messages[-1]
+                    answer = rag.answer(last_user_message)
+                    response_text = answer.get("answer", "")
+
+                    tool_calls = []
+                    if answer.get("sources"):
+                        tool_calls.append({
+                            "name": "search_knowledge_base",
+                            "arguments": {"query": last_user_message},
+                        })
+
+                    expected_tool_calls_met = True
+                    if scenario.expected_tool_calls:
+                        tool_names = [tc.get("name") for tc in tool_calls]
+                        expected_tool_calls_met = all(
+                            expected in tool_names
+                            for expected in scenario.expected_tool_calls
+                        )
+
+                    keywords_met = True
+                    if scenario.expected_keywords:
+                        response_lower = response_text.lower()
+                        keywords_met = any(
+                            keyword.lower() in response_lower
+                            for keyword in scenario.expected_keywords
+                        )
+                    else:
+                        keywords_met = True
+
+                    passed = expected_tool_calls_met
+
+                    results.append(TestResult(
+                        test_id=test_id,
+                        scenario_name=scenario.name,
+                        passed=passed,
+                        details={
+                            "expected_tool_calls_met": expected_tool_calls_met,
+                            "keywords_met": keywords_met,
+                            "sources_count": len(answer.get("sources", [])),
+                        },
+                        tool_calls=tool_calls,
+                        response=response_text,
+                    ))
+                except Exception as e:
+                    results.append(TestResult(
+                        test_id=test_id,
+                        scenario_name=scenario.name,
+                        passed=False,
+                        details={},
+                        tool_calls=[],
+                        error=str(e),
+                    ))
     else:
         # Run locally without tester (direct RAG testing)
         from memory.mcp_client import MCPClient
