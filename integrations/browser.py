@@ -260,6 +260,9 @@ class BrowserService:
                                 api_key=self.openai_api_key,
                                 temperature=0,
                             )
+                            # Add provider attribute that browser-use expects
+                            if not hasattr(llm, 'provider'):
+                                llm.provider = 'openai'
                             agent_kwargs["llm"] = llm
                             logger.info(f"Created BrowserUse Agent with LLM: {self.openai_model}")
                         except ImportError as e:
@@ -358,7 +361,7 @@ class BrowserService:
             
             # Navigate
             logger.info(f"Navigating to {url} (session: {session_id})")
-            await session.page.goto(url, wait_until="networkidle")
+            await session.page.goto(url)
             session.current_url = url
             session.update_activity()
             
@@ -455,6 +458,9 @@ class BrowserService:
                                 api_key=self.openai_api_key,
                                 temperature=0,
                             )
+                            # Add provider attribute that browser-use expects
+                            if not hasattr(llm, 'provider'):
+                                llm.provider = 'openai'
                             agent_kwargs["llm"] = llm
                         except ImportError:
                             pass
