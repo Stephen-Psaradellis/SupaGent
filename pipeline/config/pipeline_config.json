@@ -1,0 +1,33 @@
+{
+  "leads_dir": "pipeline/leads",
+  "business_data_dir": "pipeline/business_data",
+  "agents_dir": "pipeline/agents",
+  "emails_dir": "pipeline/emails",
+  "email_provider": "resend",
+  "max_leads": 10,
+  "max_pages_per_business": 50,
+  "create_elevenlabs_agents": true,
+  "send_emails": false,
+  "batch_size": 10,
+  "delay_seconds": 60,
+  "use_llm_email_generation": true,
+  "use_llm_agent_prompts": true,
+  "rate_limits": {
+    "requests_per_minute": 30,
+    "emails_per_hour": 50
+  },
+  "scraping": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "timeout_seconds": 20,
+    "max_redirects": 5
+  },
+  "content_filters": {
+    "min_content_length": 200,
+    "exclude_patterns": [
+      "/admin",
+      "/login",
+      "/wp-admin",
+      "/api/"
+    ]
+  }
+}

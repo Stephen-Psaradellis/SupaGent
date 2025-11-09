@@ -82,7 +82,7 @@ def build_app() -> FastAPI:
     # Static files
     app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-    # Mount MCP server using SDK's built-in SSE transport
+    # Mount MCP server using SDK's built-in Streamable HTTP transport
     app.mount("/mcp", mcp_app, name="mcp")
 
     # Synchronous MCP endpoint for ElevenLabs compatibility
