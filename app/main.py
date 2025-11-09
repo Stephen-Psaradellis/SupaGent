@@ -85,6 +85,60 @@ def build_app() -> FastAPI:
     # Mount MCP server using SDK's built-in SSE transport
     app.mount("/mcp", mcp_app, name="mcp")
 
+    # Synchronous MCP endpoint for ElevenLabs compatibility
+    @app.post("/mcp/tools/list")
+    async def sync_mcp_tools_list(request: Request):
+        """Synchronous endpoint for ElevenLabs MCP tool discovery.
+
+        ElevenLabs expects synchronous responses for tool discovery,
+        but the MCP SDK uses asynchronous SSE transport. This endpoint
+        provides compatibility.
+        """
+        try:
+            from app.routes.mcp_sdk import server
+
+            # Get the request body
+            body = await request.json()
+            logger.info(f"🔍 ElevenLabs tool discovery request: {body}")
+
+            # Only handle tools/list requests
+            if body.get("method") == "tools/list":
+                tools = await server.list_tools()
+                tool_list = []
+
+                for tool in tools:
+                    # Convert MCP tool format to expected response format
+                    tool_info = {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                    }
+
+                    # Add input schema if available
+                    if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                        tool_info["inputSchema"] = tool.inputSchema
+                    elif hasattr(tool, 'parameters') and tool.parameters:
+                        tool_info["inputSchema"] = tool.parameters
+
+                    tool_list.append(tool_info)
+
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": body.get("id"),
+                    "result": {
+                        "tools": tool_list
+                    }
+                }
+
+                logger.info(f"✅ Returning {len(tool_list)} tools to ElevenLabs")
+                return response
+            else:
+                logger.warning(f"⚠️  Unexpected MCP method: {body.get('method')}")
+                return {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32601, "message": "Method not found"}}
+
+        except Exception as e:
+            logger.error(f"❌ Error in sync MCP tools list: {e}", exc_info=True)
+            return {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": str(e)}}
+
     # Health check endpoint
     @app.get("/health")
     def health_check():
