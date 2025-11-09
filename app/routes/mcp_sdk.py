@@ -95,8 +95,11 @@ async def search_knowledge_base(
         Search results with relevant documentation
     """
     try:
-        from app.dependencies import get_mcp_client
-        mcp = get_mcp_client()
+        # Get mcp service from dependency injection
+        from core.di import get_container
+
+        container = get_container()
+        mcp = container.get("mcp_client")
 
         arguments = {"query": query, "k": k}
         def make_response(result: dict, is_error: bool = False) -> dict:
