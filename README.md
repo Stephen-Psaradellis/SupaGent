@@ -138,8 +138,6 @@ See `domains/README.md` for details on creating custom domain configurations.
 
 This project implements a demo-ready customer support voice agent. It runs on the ElevenLabs Agent platform (voice I/O), retrieves factual answers via a RAG pipeline, and persists memory in a vector store accessed through an MCP-style adapter.
 
-See `WARP.md.md` and `project_spec.md` for requirements. This README focuses on setup and usage.
-
 ## Setup
 
 1) Create and activate a virtual environment, then install deps:
