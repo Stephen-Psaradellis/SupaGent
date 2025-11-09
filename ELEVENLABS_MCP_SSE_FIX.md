@@ -45,9 +45,9 @@ No additional requests were made! ElevenLabs:
 
 ## The Solution
 
-### Updated SSE Endpoint
+### Updated Streamable HTTP Transport
 
-The SSE endpoint (`GET /mcp`) now **proactively sends** MCP protocol messages:
+The MCP server now uses the SDK's `streamable_http_app()` which properly handles both SSE (`GET /mcp`) and HTTP POST (`POST /mcp/messages/`) transports:
 
 1. **Server Info** (immediately upon connection):
 ```json
@@ -94,9 +94,8 @@ The SSE endpoint (`GET /mcp`) now **proactively sends** MCP protocol messages:
 ### Files Changed
 
 - **`app/routes/mcp_sdk_router.py`**
-  - Updated `mcp_sse()` function to send initialization and tools via SSE
-  - Added detailed logging for debugging
-  - Tools are now dynamically introspected and sent on connection
+  - Changed from `server.sse_app()` to `server.streamable_http_app()` to properly handle HTTP POST requests
+  - This fixes the ASGI protocol violation that was causing AssertionError on successful transactions
 
 ## Testing
 
@@ -164,35 +163,29 @@ Expected output:
    ✅ Sent 15 tools via SSE
    ```
 
-## Understanding SSE Transport
+## Understanding Streamable HTTP Transport
 
-### What is SSE?
+### What is Streamable HTTP?
 
-**Server-Sent Events (SSE)** is a one-way communication protocol:
-- Client opens connection with `GET` request
-- Server keeps connection open
-- **Server pushes events** to client as they occur
-- Format: `data: {JSON}\n\n`
+**Streamable HTTP** is the MCP SDK's unified transport that supports both:
+- **SSE (Server-Sent Events)**: One-way server-to-client communication
+- **HTTP POST**: Request-response communication for tool calls
 
-### SSE vs POST in MCP
+### Transport Methods in MCP
 
-Your MCP server supports **both** transport methods:
+Your MCP server now supports **both** transport methods:
 
-1. **SSE Transport** (used by ElevenLabs):
-   - Client: `GET /mcp` → opens SSE connection
-   - Server: Sends events via SSE stream
+1. **SSE Transport** (`GET /mcp`):
+   - Client opens SSE connection
+   - Server pushes initialization and tool updates
    - **Server-initiated** communication
 
-2. **POST Transport** (used by other MCP clients):
-   - Client: `POST /mcp` with JSON-RPC request
-   - Server: Returns JSON-RPC response
-   - **Request-response** communication
+2. **HTTP POST Transport** (`POST /mcp/messages/`):
+   - Client sends JSON-RPC requests
+   - Server returns JSON-RPC responses
+   - **Request-response** communication for tool invocations
 
-Most MCP clients (including ElevenLabs) use **SSE transport** because:
-- Real-time updates
-- Lower latency
-- Connection stays open
-- Server can push updates proactively
+The key fix: Using `streamable_http_app()` instead of `sse_app()` ensures that HTTP POST requests (like tool calls) are properly handled with correct ASGI protocol compliance.
 
 ## Troubleshooting
 
