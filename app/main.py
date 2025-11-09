@@ -86,7 +86,7 @@ def build_app() -> FastAPI:
     app.mount("/mcp", mcp_app, name="mcp")
 
     # Synchronous MCP endpoint for ElevenLabs compatibility
-    @app.post("/mcp/tools/list")
+    @app.post("/elevenlabs/mcp/tools/list")
     async def sync_mcp_tools_list(request: Request):
         """Synchronous endpoint for ElevenLabs MCP tool discovery.
 

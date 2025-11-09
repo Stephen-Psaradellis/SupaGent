@@ -1,171 +1,167 @@
 {
-  "name": "SupaGent Comprehensive Test Suite",
-  "description": "Comprehensive test suite with 10 scenarios covering password reset, account recovery, support queries, and more.",
+  "name": "SupaGent Tool Awareness & System Integration Suite",
+  "description": "Test suite verifying agent tool awareness and system tool integration. MCP tools cannot be tested for invocation in ElevenLabs.",
   "scenarios": [
     {
-      "name": "Password Reset Query",
+      "name": "System Tool - Escalate to Human",
+      "messages": [
+        {
+          "role": "user",
+          "content": "This is very urgent and I need to speak with a human immediately"
+        }
+      ],
+      "expected_tool_calls": [
+        "escalate_to_human"
+      ],
+      "expected_keywords": [
+        "escalat",
+        "human",
+        "agent"
+      ]
+    },
+    {
+      "name": "Tool Awareness - Knowledge Base Search",
       "messages": [
         {
           "role": "user",
           "content": "How do I reset my password?"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "password",
-        "reset"
+        "search",
+        "knowledge",
+        "information",
+        "help"
       ]
     },
     {
-      "name": "Account Recovery",
+      "name": "Tool Awareness - Customer Information Lookup",
       "messages": [
         {
           "role": "user",
-          "content": "I forgot my email address, how can I recover my account?"
+          "content": "Can you check my account details? My customer ID is CUST-12345"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
         "account",
-        "recover"
+        "customer",
+        "information",
+        "lookup"
       ]
     },
     {
-      "name": "Multi-turn Conversation",
+      "name": "Tool Awareness - Order Status Check",
       "messages": [
         {
           "role": "user",
-          "content": "How do I reset my password?"
-        },
-        {
-          "role": "assistant",
-          "content": "You can reset your password by going to Settings."
-        },
-        {
-          "role": "user",
-          "content": "What if I don't have access to my email?"
+          "content": "What's the status of my order number ORD-67890?"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "email"
+        "order",
+        "status",
+        "check",
+        "track"
       ]
     },
     {
-      "name": "General Support Question",
+      "name": "Tool Awareness - Support Ticket Creation",
       "messages": [
         {
           "role": "user",
-          "content": "How do I contact customer support?"
+          "content": "I need to create a support ticket for this critical issue"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
+        "ticket",
         "support",
-        "contact"
+        "create",
+        "issue"
       ]
     },
     {
-      "name": "Product Feature Query",
+      "name": "Tool Awareness - Calendar Availability",
       "messages": [
         {
           "role": "user",
-          "content": "What features are available in your product?"
+          "content": "What times are available for a meeting next Tuesday?"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "feature"
+        "available",
+        "calendar",
+        "schedule",
+        "meeting"
       ]
     },
     {
-      "name": "Troubleshooting Query",
+      "name": "Tool Awareness - Browser Navigation",
       "messages": [
         {
           "role": "user",
-          "content": "I'm having trouble logging in, what should I do?"
+          "content": "Can you check the latest documentation on our website?"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "login",
-        "trouble"
+        "website",
+        "documentation",
+        "check",
+        "browse"
       ]
     },
     {
-      "name": "Policy Question",
+      "name": "System Integration - Call Logging",
       "messages": [
         {
           "role": "user",
-          "content": "What is your refund policy?"
+          "content": "Please make sure this conversation gets logged for compliance"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "refund",
-        "policy"
+        "log",
+        "record",
+        "compliance",
+        "conversation"
       ]
     },
     {
-      "name": "Account Management",
+      "name": "Multi-Tool Scenario - Complex Support",
       "messages": [
         {
           "role": "user",
-          "content": "How can I update my account information?"
+          "content": "I'm having trouble with my account, I can't log in, and I need to check my order status too"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
         "account",
-        "update"
+        "login",
+        "order",
+        "help",
+        "multiple"
       ]
     },
     {
-      "name": "Payment Question",
+      "name": "Fallback Response - Tool Unavailable",
       "messages": [
         {
           "role": "user",
-          "content": "What payment methods do you accept?"
+          "content": "Can you access my bank account details?"
         }
       ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
+      "expected_tool_calls": [],
       "expected_keywords": [
-        "payment",
-        "method"
-      ]
-    },
-    {
-      "name": "Subscription Query",
-      "messages": [
-        {
-          "role": "user",
-          "content": "How do I upgrade my subscription?"
-        }
-      ],
-      "expected_tool_calls": [
-        "search_knowledge_base"
-      ],
-      "expected_keywords": [
-        "subscription",
-        "upgrade"
+        "cannot",
+        "unable",
+        "security",
+        "policy"
       ]
     }
   ]
