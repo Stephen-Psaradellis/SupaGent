@@ -96,9 +96,9 @@ async def search_knowledge_base(
     """
     try:
         # Get mcp service from dependency injection
-        from core.di import get_container
+        from core.di import create_container
 
-        container = get_container()
+        container = create_container()
         mcp = container.get("mcp_client")
 
         arguments = {"query": query, "k": k}
@@ -136,9 +136,9 @@ async def create_support_ticket(
     try:
         # Get crm service from dependency injection
 
-        from core.di import get_container
+        from core.di import create_container
 
-        container = get_container()
+        container = create_container()
 
         crm = container.get("crm")
 
@@ -176,9 +176,9 @@ async def get_customer_info(
     try:
         # Get crm service from dependency injection
 
-        from core.di import get_container
+        from core.di import create_container
 
-        container = get_container()
+        container = create_container()
 
         crm = container.get("crm")
         
@@ -218,9 +218,9 @@ async def escalate_to_human(
     try:
         # Get escalations service from dependency injection
 
-        from core.di import get_container
+        from core.di import create_container
 
-        container = get_container()
+        container = create_container()
 
         escalations = container.get("escalations")
         
@@ -263,9 +263,9 @@ async def log_interaction(
     try:
         # Get crm service from dependency injection
 
-        from core.di import get_container
+        from core.di import create_container
 
-        container = get_container()
+        container = create_container()
 
         crm = container.get("crm")
         

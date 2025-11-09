@@ -321,3 +321,4 @@ data: {"jsonrpc":"2.0","method":"...","params":{...}}
 The key insight: **With SSE transport, the server must push data to the client** rather than waiting for requests. ElevenLabs opens the connection and immediately expects to receive the tools list via the SSE stream.
 
 
+
