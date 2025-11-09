@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 def create_mcp_app():
     """
-    Create the MCP ASGI app using the SDK's built-in SSE transport.
+    Create the MCP ASGI app using the SDK's built-in Streamable HTTP transport.
 
     The SDK handles all MCP protocol compliance, tool discovery, and transport automatically.
     """
-    # Configure the server for SSE transport
-    mcp_app = server.sse_app()
+    # Configure the server for Streamable HTTP transport (supports both SSE and HTTP POST)
+    mcp_app = server.streamable_http_app()
 
     # Add synchronous endpoint for ElevenLabs compatibility
     from starlette.responses import JSONResponse
