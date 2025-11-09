@@ -21,8 +21,7 @@ WORKDIR /app
 # This layer is cached unless requirements.txt changes
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --user --no-cache-dir -r requirements.txt && \
-    python -c "import browser_use; print('✅ browser-use installed successfully')" || echo "❌ browser-use installation failed"
+    pip install --user --no-cache-dir -r requirements.txt
 
 # Runtime stage - smaller image
 FROM python:3.11-slim
