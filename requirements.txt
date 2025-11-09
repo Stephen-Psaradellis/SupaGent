@@ -46,5 +46,16 @@ google-auth-httplib2>=0.1.1
 browser-use==0.9.5  # Requires Python 3.11+
 playwright>=1.40.0
 
-# Development only (not needed in production)
-# pytest>=7.4.0
+# Email sending (optional - choose one)
+# resend  # For Resend email API
+# mailgun-python  # For Mailgun email API
+# sib-api-v3-sdk  # For Brevo/Sendinblue email API
+
+# Development and Testing
+pytest>=7.4.0
+pytest-mock>=3.12.0
+
+# Additional utilities for pipeline
+lxml>=4.9.0  # Better HTML parsing
+selenium>=4.15.0  # For advanced web scraping if needed
+webdriver-manager>=4.0.0  # For Selenium webdriver management

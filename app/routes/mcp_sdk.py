@@ -737,14 +737,14 @@ async def browser_screenshot(
 ) -> str:
     """
     Capture a screenshot of the current page or a specific element.
-    
+
     Useful for visual verification or debugging.
-    
+
     Args:
         session_id: Browser session ID (defaults to 'default')
         full_page: Whether to capture the full scrollable page (default: false)
         selector: Optional CSS selector to screenshot a specific element
-        
+
     Returns:
         Screenshot confirmation with path
     """
@@ -754,17 +754,208 @@ async def browser_screenshot(
             "full_page": full_page,
             "selector": selector
         }
-        
+
         def make_response(result: dict, is_error: bool = False) -> dict:
             return result
-        
+
         response = await handle_browser_screenshot(arguments, make_response)
         text = extract_text_from_mcp_response(response)
-        
+
         return text
     except Exception as e:
         logger.error(f"Error in browser_extract: {e}", exc_info=True)
         return f"Error in browser_extract: {str(e)}"
+
+
+@server.tool()
+async def search_business_intelligence(
+    domain: str,
+    query: str,
+    content_types: Optional[list[str]] = None,
+    k: int = 5
+) -> str:
+    """
+    Search business intelligence data for a specific company domain.
+
+    This tool accesses the vectorized business data collected during the growth pipeline,
+    including website content, services, team information, and blog posts.
+
+    Args:
+        domain: Business domain (e.g., 'example.com')
+        query: Search query for relevant business information
+        content_types: Optional list of content types to search ('services', 'about', 'team', 'blog', 'general')
+        k: Number of results to return (default: 5, max: 10)
+
+    Returns:
+        Relevant business intelligence and context
+    """
+    try:
+        from core.di import create_container
+
+        container = create_container()
+        vector_store = container.get("vector_store")
+
+        # Load domain-specific vector store if it exists
+        domain_dir = f"pipeline/business_data/{domain.replace('.', '_')}/vectors"
+        if os.path.exists(domain_dir):
+            # Use domain-specific vector store
+            from memory.vector_store import VectorStore
+            domain_store = VectorStore(persist_dir=domain_dir)
+
+            # Filter by content types if specified
+            metadata_filter = {}
+            if content_types:
+                # For domain-specific stores, we can filter by content_type
+                search_results = domain_store.similarity_search(query, k=k)
+                filtered_results = [
+                    result for result in search_results
+                    if result.get("metadata", {}).get("content_type") in content_types
+                ]
+                if filtered_results:
+                    search_results = filtered_results[:k]
+            else:
+                search_results = domain_store.similarity_search(query, k=k)
+        else:
+            # Fall back to main vector store with namespace filtering
+            namespace_query = f"{query} namespace:kb:{domain}"
+            search_results = vector_store.similarity_search(namespace_query, k=k)
+
+        if not search_results:
+            return f"No business intelligence found for {domain} matching query: {query}"
+
+        # Format results
+        formatted_results = []
+        for i, result in enumerate(search_results, 1):
+            metadata = result.get("metadata", {})
+            content_type = metadata.get("content_type", "general")
+            url = metadata.get("url", "Unknown")
+            title = metadata.get("title", "Untitled")
+
+            formatted_results.append(f"""
+{i}. **{title}** ({content_type})
+   Source: {url}
+   Content: {result['page_content'][:300]}{'...' if len(result['page_content']) > 300 else ''}
+""")
+
+        summary = f"""
+Business Intelligence for {domain}
+Query: {query}
+Content Types: {content_types or 'all'}
+Results Found: {len(search_results)}
+
+{'---'.join(formatted_results)}
+"""
+
+        return summary.strip()
+
+    except Exception as e:
+        logger.error(f"Error in search_business_intelligence: {e}", exc_info=True)
+        return f"Error searching business intelligence: {str(e)}"
+
+
+@server.tool()
+async def get_business_profile(
+    domain: str
+) -> str:
+    """
+    Get comprehensive business profile and intelligence summary.
+
+    Retrieves structured information about a business including services,
+    team, about information, and contact details.
+
+    Args:
+        domain: Business domain (e.g., 'example.com')
+
+    Returns:
+        Complete business profile and intelligence summary
+    """
+    try:
+        import json
+        from pathlib import Path
+
+        # Load business data
+        data_dir = Path("pipeline/business_data") / domain.replace(".", "_")
+        content_file = data_dir / "content.json"
+
+        if not content_file.exists():
+            return f"No business intelligence data found for {domain}"
+
+        with open(content_file, 'r', encoding='utf-8') as f:
+            content_data = json.load(f)
+
+        # Load agent configuration if available
+        agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent.json"
+        agent_info = ""
+        if agent_file.exists():
+            with open(agent_file, 'r', encoding='utf-8') as f:
+                agent_data = json.load(f)
+                agent_info = f"""
+Voice Agent Configuration:
+- Name: {agent_data.get('agent_name', 'Not configured')}
+- Personality: {agent_data.get('personality', 'Not configured')}
+- Industry: {agent_data.get('industry', 'Not configured')}
+- Conversation Style: {agent_data.get('conversation_style', 'Not configured')}
+- Tone Keywords: {', '.join(agent_data.get('tone_keywords', []))}
+"""
+
+        # Summarize content by type
+        summaries = {}
+        for content_type, items in content_data.items():
+            if items:
+                combined_content = " ".join([item["content"][:200] for item in items[:3]])
+                summaries[content_type] = combined_content[:500]
+
+        # Load lead data if available
+        lead_data = {}
+        leads_dir = Path("pipeline/leads")
+        for json_file in leads_dir.rglob("*.json"):
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    lead_info = json.load(f)
+                    if isinstance(lead_info, list):
+                        for lead in lead_info:
+                            if lead.get("domain") == domain:
+                                lead_data = lead
+                                break
+                    elif isinstance(lead_info, dict) and lead_info.get("domain") == domain:
+                        lead_data = lead_info
+                        break
+            except:
+                continue
+
+        # Build comprehensive profile
+        profile = f"""
+BUSINESS PROFILE: {domain}
+
+COMPANY INFORMATION:
+- Name: {lead_data.get('name', 'Unknown')}
+- Industry: {lead_data.get('industry', 'Unknown')}
+- Location: {lead_data.get('location', 'Unknown')}
+- Email: {lead_data.get('email', 'Not found')}
+- Source: {lead_data.get('source', 'Unknown')}
+
+SERVICES: {summaries.get('services', 'Not available')}
+
+ABOUT: {summaries.get('about', 'Not available')}
+
+TEAM: {summaries.get('team', 'Not available')}
+
+BLOG/CONTENT: {summaries.get('blog', 'Not available')}
+
+{agent_info}
+
+INTELLIGENCE SUMMARY:
+- Content Types Available: {', '.join(content_data.keys())}
+- Total Content Items: {sum(len(items) for items in content_data.values())}
+- Agent Configured: {'Yes' if agent_info else 'No'}
+- Lead Status: {'Qualified' if lead_data.get('email') else 'Needs Email'}
+"""
+
+        return profile.strip()
+
+    except Exception as e:
+        logger.error(f"Error in get_business_profile: {e}", exc_info=True)
+        return f"Error retrieving business profile: {str(e)}"
 
 
 # Note: FastMCP handles logging automatically through the SDK
