@@ -25,73 +25,91 @@ def create_mcp_app():
     # Configure the server for SSE transport
     mcp_app = server.sse_app()
 
-    # Also create a synchronous HTTP endpoint for ElevenLabs compatibility
-    from fastapi import APIRouter, HTTPException
-    from fastapi.responses import JSONResponse
-    import json
+    # Add synchronous endpoint for ElevenLabs compatibility
+    from starlette.responses import JSONResponse
 
-    sync_router = APIRouter()
-
-    @sync_router.post("/tools/list")
-    async def sync_tools_list():
-        """Synchronous endpoint for ElevenLabs tool discovery."""
-        try:
-            tools = await server.list_tools()
-            tool_list = []
-            for tool in tools:
-                tool_list.append({
-                    "name": tool.name,
-                    "description": tool.description or "",
-                    "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
-                })
-
-            return {
-                "jsonrpc": "2.0",
-                "id": None,  # ElevenLabs doesn't send an ID
-                "result": {
-                    "tools": tool_list
-                }
-            }
-        except Exception as e:
-            logger.error(f"Error in sync tools list: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
-    # Mount the sync router
-    from starlette.middleware.base import BaseHTTPMiddleware
-
-    class SyncMCPMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next):
-            # Intercept requests to /mcp/tools/list and route to sync endpoint
-            if request.url.path == "/mcp/tools/list":
-                # Parse JSON body
+    # Create a wrapper ASGI app that handles both SSE and sync endpoints
+    async def mcp_wrapper(scope, receive, send):
+        if scope["type"] == "http" and scope["method"] == "POST":
+            path = scope["path"]
+            if path == "/tools/list":
+                # Handle synchronous tools/list request for ElevenLabs
                 try:
-                    body = await request.json()
-                    if body.get("method") == "tools/list":
-                        # Return sync response
+                    # Read the request body
+                    body = await receive_body(receive)
+                    import json
+                    request_data = json.loads(body.decode())
+
+                    if request_data.get("method") == "tools/list":
+                        # Get tools synchronously
                         tools = await server.list_tools()
                         tool_list = []
+
                         for tool in tools:
-                            tool_list.append({
+                            tool_info = {
                                 "name": tool.name,
                                 "description": tool.description or "",
-                                "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
-                            })
+                            }
 
-                        return JSONResponse({
+                            # Add input schema if available
+                            if hasattr(tool, 'inputSchema') and tool.inputSchema:
+                                tool_info["inputSchema"] = tool.inputSchema
+                            elif hasattr(tool, 'parameters') and tool.parameters:
+                                tool_info["inputSchema"] = tool.parameters
+
+                            tool_list.append(tool_info)
+
+                        response = {
                             "jsonrpc": "2.0",
-                            "id": body.get("id"),
+                            "id": request_data.get("id"),
                             "result": {
                                 "tools": tool_list
                             }
+                        }
+
+                        # Send synchronous response
+                        await send({
+                            "type": "http.response.start",
+                            "status": 200,
+                            "headers": [(b"content-type", b"application/json")],
                         })
+                        await send({
+                            "type": "http.response.body",
+                            "body": json.dumps(response).encode(),
+                        })
+                        return
                 except Exception as e:
-                    logger.error(f"Error in sync middleware: {e}")
-                    pass
+                    logger.error(f"Error in sync MCP endpoint: {e}")
+                    # Send error response
+                    await send({
+                        "type": "http.response.start",
+                        "status": 500,
+                        "headers": [(b"content-type", b"application/json")],
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": json.dumps({"error": str(e)}).encode(),
+                    })
+                    return
 
-            return await call_next(request)
+        # For all other requests, use the normal MCP app
+        await mcp_app(scope, receive, send)
 
-    # Wrap the app with sync middleware
-    mcp_app = SyncMCPMiddleware(mcp_app)
+    return mcp_wrapper
+
+
+async def receive_body(receive):
+    """Helper to read the full request body."""
+    body = b""
+    while True:
+        message = await receive()
+        if message["type"] == "http.request":
+            body += message.get("body", b"")
+            if not message.get("more_body", False):
+                break
+        elif message["type"] == "http.disconnect":
+            break
+    return body
 
     # Add authentication middleware if required
     if MCP_AUTH_REQUIRED and MCP_AUTH_TOKEN:
