@@ -207,3 +207,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Large dataset files
+pipeline/yelp_academic_dataset_business.json
+pipeline/cache/*.sqlite3
