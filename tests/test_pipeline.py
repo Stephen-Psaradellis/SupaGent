@@ -11,6 +11,7 @@ Tests cover:
 - End-to-end pipeline integration
 """
 
+import asyncio
 import json
 import os
 import shutil
@@ -21,7 +22,15 @@ from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
-from pipeline.lead_generation import LeadGenerator, Lead
+from pipeline.lead_generation import (
+    GooglePlacesConnector,
+    HTTPResult,
+    Lead,
+    LeadGenerator,
+    LeadPipelineContext,
+    LeadPipelineSettings,
+    LeadQuery,
+)
 from pipeline.business_intelligence import BusinessIntelligenceLoader
 from pipeline.voice_agent_generator import VoiceAgentGenerator, AgentConfig
 from pipeline.email_composer import EmailComposer
@@ -37,6 +46,10 @@ class TestLeadGeneration(unittest.TestCase):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.generator = LeadGenerator(self.temp_dir)
+        # Disable real connectors/enrichers to keep tests deterministic.
+        self.generator.sources = {}
+        self.generator.enrichers = {}
+        self.generator.filter.min_score = 0.0
 
     def tearDown(self):
         """Clean up test fixtures."""
@@ -53,8 +66,28 @@ class TestLeadGeneration(unittest.TestCase):
         # Save leads
         self.generator._save_leads(leads, "dentists", "Chicago, IL")
 
+        duplicate_lead = Lead(
+            "Test Dental",
+            "testdental.com",
+            "Chicago, IL",
+            "dentists",
+            "info@testdental.com",
+            source="stub",
+        )
+
+        class StubConnector:
+            name = "stub"
+
+            async def fetch(self, query, context):
+                return [duplicate_lead]
+
+            def is_configured(self, settings):
+                return True
+
+        self.generator.sources = {"stub": StubConnector()}
+
         # Generate leads again - should be deduplicated
-        new_leads = self.generator.generate_leads("dentists", "Chicago, IL", limit=10)
+        new_leads = self.generator.generate_leads("dentists", "Chicago, IL", limit=10, sources=["stub"])
 
         # Should not include the existing lead
         matching_leads = [l for l in new_leads if l.domain == "testdental.com"]
@@ -73,20 +106,67 @@ class TestLeadGeneration(unittest.TestCase):
         self.assertEqual(hash1, hash2)  # Same lead
         self.assertNotEqual(hash1, hash3)  # Different email
 
-    @patch('pipeline.lead_generation.requests.Session')
-    def test_google_maps_search(self, mock_session):
-        """Test Google Maps search functionality."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = "<html><title>Test</title></html>"
-        mock_session.return_value.get.return_value = mock_response
+    def test_google_places_connector_parses_results(self):
+        """Ensure Google Places connector normalizes API results."""
 
-        leads = self.generator._search_google_maps("dentists", "Chicago, IL", 5)
+        settings = LeadPipelineSettings.from_env(
+            leads_dir=Path(self.temp_dir),
+            cache_path=Path(self.temp_dir) / "cache.sqlite3",
+            google_places_api_key="dummy-key",
+        )
 
-        # Should return mock leads
+        connector = GooglePlacesConnector()
+
+        class StubHTTP:
+            """Stub HTTP client returning canned responses."""
+
+            async def get(self, url, **kwargs):
+                if "textsearch" in url:
+                    return HTTPResult(
+                        url=url,
+                        status_code=200,
+                        headers={},
+                        json={
+                            "results": [
+                                {
+                                    "place_id": "abc123",
+                                    "name": "Test Dental",
+                                    "formatted_address": "123 Main St",
+                                    "types": ["dentist"],
+                                }
+                            ]
+                        },
+                    )
+                return HTTPResult(
+                    url=url,
+                    status_code=200,
+                    headers={},
+                    json={
+                        "result": {
+                            "name": "Test Dental",
+                            "website": "https://example.com",
+                            "formatted_address": "123 Main St",
+                            "formatted_phone_number": "+1-312-555-1000",
+                            "url": "https://maps.google.com/?cid=abc123",
+                            "business_status": "OPERATIONAL",
+                        }
+                    },
+                )
+
+        context = LeadPipelineContext(
+            settings=settings,
+            cache=self.generator.cache,
+            http=StubHTTP(),
+        )
+        query = LeadQuery(industry="dentists", location="Chicago, IL", limit=5)
+        leads = asyncio.run(connector.fetch(query, context))
+
         self.assertIsInstance(leads, list)
-        if leads:
-            self.assertIsInstance(leads[0], Lead)
+        self.assertTrue(leads)
+        lead = leads[0]
+        self.assertIsInstance(lead, Lead)
+        self.assertEqual(lead.domain, "example.com")
+        self.assertEqual(lead.source, connector.name)
 
 
 class TestBusinessIntelligence(unittest.TestCase):
