@@ -60,7 +60,6 @@ class GrowthAutomationPipeline:
             use_llm=self.config.get("use_llm_email_generation", True)
         )
         self.email_sender = EmailSender(
-            self.config.get("email_provider", "resend"),
             self.config.get("emails_dir", "pipeline/emails")
         )
 
@@ -73,7 +72,6 @@ class GrowthAutomationPipeline:
             "business_data_dir": "pipeline/business_data",
             "agents_dir": "pipeline/agents",
             "emails_dir": "pipeline/emails",
-            "email_provider": "resend",
             "max_leads": 10,
             "max_pages_per_business": 50,
             "create_elevenlabs_agents": True,

@@ -78,17 +78,17 @@ class EmailSender:
         # Resolve paths relative to project root (parent of pipeline directory)
         # If __file__ is pipeline/email_sender.py, then parent.parent is project root
         project_root = Path(__file__).parent.parent
-
+        
         if not Path(emails_dir).is_absolute():
             self.emails_dir = project_root / emails_dir
         else:
             self.emails_dir = Path(emails_dir)
-
+            
         if not Path(config_file).is_absolute():
             self.config_file = project_root / config_file
         else:
             self.config_file = Path(config_file)
-
+            
         self.config = self._load_config()
         self.session = requests.Session()
 
@@ -213,6 +213,7 @@ class EmailSender:
         except Exception as e:
             logger.error(f"ElasticEmail API request failed: {e}")
             return None
+
 
     def _convert_text_to_html(self, text: str) -> str:
         """Convert plain text email to HTML format.

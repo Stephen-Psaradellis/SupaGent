@@ -46,10 +46,7 @@ google-auth-httplib2>=0.1.1
 browser-use==0.9.5  # Requires Python 3.11+
 playwright>=1.40.0
 
-# Email sending (optional - choose one)
-# resend  # For Resend email API
-# mailgun-python  # For Mailgun email API
-# sib-api-v3-sdk  # For Brevo/Sendinblue email API
+# Email sending via ElasticEmail API (uses requests, already included above)
 
 # Development and Testing
 pytest>=7.4.0

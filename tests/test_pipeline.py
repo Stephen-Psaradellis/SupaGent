@@ -363,18 +363,18 @@ class TestEmailSender(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
-        self.sender = EmailSender("resend", self.temp_dir)
+        self.sender = EmailSender(self.temp_dir)
 
     def tearDown(self):
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch('pipeline.email_sender.requests.Session')
-    def test_resend_email_sending(self, mock_session):
-        """Test Resend email sending."""
+    def test_elasticemail_sending(self, mock_session):
+        """Test ElasticEmail sending."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"id": "test_message_id"}
+        mock_response.json.return_value = {"success": True, "data": {"messageid": "test_message_id"}}
         mock_session.return_value.post.return_value = mock_response
 
         template = {
@@ -384,10 +384,10 @@ class TestEmailSender(unittest.TestCase):
             "domain": "example.com"
         }
 
-        result = self.sender._send_via_resend(template)
+        result = self.sender._send_via_elasticemail(template)
 
         self.assertIsNotNone(result)
-        self.assertEqual(result["id"], "test_message_id")
+        self.assertEqual(result["message_id"], "test_message_id")
 
     def test_html_conversion(self):
         """Test plain text to HTML conversion."""
