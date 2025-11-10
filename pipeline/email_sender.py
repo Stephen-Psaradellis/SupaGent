@@ -2,11 +2,11 @@
 Outbound Email Sender for Growth Automation Pipeline.
 
 Sends personalized cold outreach emails with embedded voice agents using
-transactional email APIs (Resend, Mailgun, Brevo). Includes comprehensive
-tracking for opens, clicks, and engagement metrics.
+ElasticEmail transactional email API. Includes comprehensive tracking for
+opens, clicks, and engagement metrics.
 
 Features:
-- Multi-provider email sending (Resend, Mailgun, Brevo)
+- ElasticEmail provider for reliable email delivery
 - Open and click tracking
 - Bounce and complaint handling
 - Rate limiting and deliverability best practices
@@ -62,46 +62,42 @@ class EmailStatus:
 
 
 class EmailSender:
-    """Sends outbound emails with tracking via transactional APIs."""
+    """Sends outbound emails with tracking via ElasticEmail API."""
 
     def __init__(
         self,
-        provider: str = "resend",
         emails_dir: str = "pipeline/emails",
         config_file: str = "pipeline/config/email_config.json"
     ):
         """Initialize email sender.
 
         Args:
-            provider: Email provider ('resend', 'mailgun', 'brevo')
             emails_dir: Directory containing email templates
             config_file: Email configuration file
         """
-        self.provider = provider.lower()
-        self.emails_dir = Path(emails_dir)
-        self.config_file = Path(config_file)
+        # Resolve paths relative to project root (parent of pipeline directory)
+        # If __file__ is pipeline/email_sender.py, then parent.parent is project root
+        project_root = Path(__file__).parent.parent
+
+        if not Path(emails_dir).is_absolute():
+            self.emails_dir = project_root / emails_dir
+        else:
+            self.emails_dir = Path(emails_dir)
+
+        if not Path(config_file).is_absolute():
+            self.config_file = project_root / config_file
+        else:
+            self.config_file = Path(config_file)
+
         self.config = self._load_config()
         self.session = requests.Session()
 
     def _load_config(self) -> Dict:
         """Load email configuration including API keys."""
         config = {
-            "resend": {
-                "api_key": os.getenv("RESEND_API_KEY"),
-                "from_email": os.getenv("FROM_EMAIL", "noreply@yourdomain.com"),
-                "from_name": os.getenv("FROM_NAME", "AI Solutions"),
-            },
-            "mailgun": {
-                "api_key": os.getenv("MAILGUN_API_KEY"),
-                "domain": os.getenv("MAILGUN_DOMAIN"),
-                "from_email": os.getenv("FROM_EMAIL", "noreply@yourdomain.com"),
-                "from_name": os.getenv("FROM_NAME", "AI Solutions"),
-            },
-            "brevo": {
-                "api_key": os.getenv("BREVO_API_KEY"),
-                "from_email": os.getenv("FROM_EMAIL", "noreply@yourdomain.com"),
-                "from_name": os.getenv("FROM_NAME", "AI Solutions"),
-            }
+            "api_key": os.getenv("ELASTICEMAIL_API_KEY"),
+            "from_email": os.getenv("FROM_EMAIL", "noreply@yourdomain.com"),
+            "from_name": os.getenv("FROM_NAME", "AI Solutions"),
         }
 
         # Load from config file if it exists
@@ -139,16 +135,8 @@ class EmailSender:
 
             logger.info(f"📤 Sending email to {template['recipient_email']} for {template['business_name']}")
 
-            # Send via configured provider
-            if self.provider == "resend":
-                result = self._send_via_resend(template)
-            elif self.provider == "mailgun":
-                result = self._send_via_mailgun(template)
-            elif self.provider == "brevo":
-                result = self._send_via_brevo(template)
-            else:
-                logger.error(f"❌ Unsupported email provider: {self.provider}")
-                return False
+            # Send via ElasticEmail
+            result = self._send_via_elasticemail(template)
 
             if result:
                 message_id = result.get("message_id") or result.get("id")
@@ -174,8 +162,8 @@ class EmailSender:
             logger.error(f"❌ Error sending email for {domain}: {e}")
             return False
 
-    def _send_via_resend(self, template: Dict) -> Optional[Dict]:
-        """Send email via Resend API.
+    def _send_via_elasticemail(self, template: Dict) -> Optional[Dict]:
+        """Send email via ElasticEmail API.
 
         Args:
             template: Email template data
@@ -183,126 +171,47 @@ class EmailSender:
         Returns:
             Response data if successful, None otherwise
         """
-        api_key = self.config["resend"]["api_key"]
+        api_key = self.config["api_key"]
         if not api_key:
-            logger.error("❌ Resend API key not configured")
+            logger.error("❌ ElasticEmail API key not configured")
             return None
 
-        url = "https://api.resend.com/emails"
+        url = "https://api.elasticemail.com/v2/email/send"
         headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/x-www-form-urlencoded"
         }
 
         # Build email data
         email_data = {
-            "from": f"{self.config['resend']['from_name']} <{self.config['resend']['from_email']}>",
-            "to": [template["recipient_email"]],
-            "subject": template["subject"],
-            "html": self._convert_text_to_html(template["body"]),
-        }
-
-        # Add tracking if enabled
-        email_data["tags"] = [{"name": "domain", "value": template["domain"]}]
-
-        try:
-            response = self.session.post(url, headers=headers, json=email_data, timeout=30)
-
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logger.error(f"Resend API error: {response.status_code} - {response.text}")
-                return None
-
-        except Exception as e:
-            logger.error(f"Resend API request failed: {e}")
-            return None
-
-    def _send_via_mailgun(self, template: Dict) -> Optional[Dict]:
-        """Send email via Mailgun API.
-
-        Args:
-            template: Email template data
-
-        Returns:
-            Response data if successful, None otherwise
-        """
-        api_key = self.config["mailgun"]["api_key"]
-        domain = self.config["mailgun"]["domain"]
-
-        if not api_key or not domain:
-            logger.error("❌ Mailgun API key or domain not configured")
-            return None
-
-        url = f"https://api.mailgun.net/v3/{domain}/messages"
-        auth = ("api", api_key)
-
-        # Build form data
-        email_data = {
-            "from": f"{self.config['mailgun']['from_name']} <{self.config['mailgun']['from_email']}>",
+            "apikey": api_key,
+            "from": self.config["from_email"],
+            "fromName": self.config["from_name"],
             "to": template["recipient_email"],
             "subject": template["subject"],
-            "html": self._convert_text_to_html(template["body"]),
-            "v:domain": template["domain"],  # Custom variable for tracking
+            "bodyHtml": self._convert_text_to_html(template["body"]),
+            "bodyText": template["body"],  # Include plain text version
         }
 
+        # Add tracking tags
+        email_data["tag"] = template["domain"]
+
         try:
-            response = self.session.post(url, auth=auth, data=email_data, timeout=30)
+            response = self.session.post(url, headers=headers, data=email_data, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
-                return {"message_id": result.get("id")}
+                if result.get("success"):
+                    # Return message ID in expected format
+                    return {"message_id": result.get("data", {}).get("messageid")}
+                else:
+                    logger.error(f"ElasticEmail API error: {result.get('error')}")
+                    return None
             else:
-                logger.error(f"Mailgun API error: {response.status_code} - {response.text}")
+                logger.error(f"ElasticEmail API error: {response.status_code} - {response.text}")
                 return None
 
         except Exception as e:
-            logger.error(f"Mailgun API request failed: {e}")
-            return None
-
-    def _send_via_brevo(self, template: Dict) -> Optional[Dict]:
-        """Send email via Brevo API.
-
-        Args:
-            template: Email template data
-
-        Returns:
-            Response data if successful, None otherwise
-        """
-        api_key = self.config["brevo"]["api_key"]
-        if not api_key:
-            logger.error("❌ Brevo API key not configured")
-            return None
-
-        url = "https://api.brevo.com/v3/smtp/email"
-        headers = {
-            "api-key": api_key,
-            "Content-Type": "application/json"
-        }
-
-        # Build email data
-        email_data = {
-            "sender": {
-                "name": self.config["brevo"]["from_name"],
-                "email": self.config["brevo"]["from_email"]
-            },
-            "to": [{"email": template["recipient_email"]}],
-            "subject": template["subject"],
-            "htmlContent": self._convert_text_to_html(template["body"]),
-            "tags": [template["domain"]],
-        }
-
-        try:
-            response = self.session.post(url, headers=headers, json=email_data, timeout=30)
-
-            if response.status_code == 201:
-                return response.json()
-            else:
-                logger.error(f"Brevo API error: {response.status_code} - {response.text}")
-                return None
-
-        except Exception as e:
-            logger.error(f"Brevo API request failed: {e}")
+            logger.error(f"ElasticEmail API request failed: {e}")
             return None
 
     def _convert_text_to_html(self, text: str) -> str:
@@ -441,17 +350,16 @@ def main():
     """CLI interface for email sending."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Send outbound emails")
+    parser = argparse.ArgumentParser(description="Send outbound emails via ElasticEmail")
     parser.add_argument("--domain", help="Specific domain to send to")
     parser.add_argument("--domains-file", help="File containing list of domains")
-    parser.add_argument("--provider", default="resend", choices=["resend", "mailgun", "brevo"], help="Email provider")
     parser.add_argument("--batch-size", type=int, default=10, help="Emails per batch")
     parser.add_argument("--delay", type=int, default=60, help="Delay between batches (seconds)")
     parser.add_argument("--emails-dir", default="pipeline/emails", help="Emails directory")
 
     args = parser.parse_args()
 
-    sender = EmailSender(args.provider, args.emails_dir)
+    sender = EmailSender(args.emails_dir)
 
     if args.domain:
         # Send single email

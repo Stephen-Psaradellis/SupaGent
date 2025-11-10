@@ -1,0 +1,89 @@
+dentist
+medical spa
+chiropractor
+optometrist
+therapist
+family doctor
+urgent care clinic
+veterinarian
+pet groomer
+barbershop
+hair salon
+nail salon
+beauty spa
+HVAC contractor
+plumber
+electrician
+landscaper
+cleaning service
+auto repair shop
+car detailing
+real estate agent
+property manager
+fitness trainer
+yoga instructor
+pilates studio
+gym
+tutoring center
+private tutor
+language coach
+marketing agency
+digital agency
+creative agency
+salon
+medical
+fitness
+dog walker
+pest control service
+carpet cleaning
+handyman
+pool cleaning
+car wash
+towing service
+law firm
+tax preparer
+accounting firm
+bookkeeping service
+financial advisor
+insurance broker
+mortgage broker
+home inspector
+construction contractor
+remodeling company
+roofing contractor
+life coach
+career coach
+business consultant
+recruiting agency
+staffing agency
+HR consultancy
+IT services company
+web design agency
+software development firm
+SEO consultancy
+marketing SaaS provider
+customer support SaaS
+CRM provider
+music teacher
+nutritionist
+marketing SaaS
+food delivery brand
+meal prep business
+e-commerce brand
+online boutique
+subscription box service
+pet supply store
+furniture retailer
+home decor brand
+electronics store
+auto parts retailer
+beauty product brand
+health supplement company
+real estate SaaS
+AI automation agency
+virtual assistant service
+call center outsourcing firm
+customer service training firm
+branding agency
+advertising firm
+marketing consultancy

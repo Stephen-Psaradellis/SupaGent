@@ -1,0 +1,17 @@
+{
+  "dentist": {
+    "count": 0,
+    "emails": 0,
+    "leads": []
+  },
+  "medical spa": {
+    "count": 0,
+    "emails": 0,
+    "leads": []
+  },
+  "chiropractor": {
+    "count": 0,
+    "emails": 0,
+    "leads": []
+  }
+}

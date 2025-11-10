@@ -85,22 +85,8 @@ Edit `pipeline/config/pipeline_config.json`:
 
 For AI-powered email generation, configure OpenRouter API:
 
-**Environment Variables:**
-```bash
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=mistralai/mistral-7b-instruct:free
-MCP_SERVER_URL=http://localhost:8000/mcp
-```
-
 **OpenRouter Config** (`pipeline/config/openrouter_config.json`):
-```json
-{
-  "model": "mistralai/mistral-7b-instruct:free",
-  "temperature": 0.7,
-  "max_tokens": 4000,
-  "mcp_server_url": "http://localhost:8000/mcp"
-}
-```
+
 
 ### ElevenLabs System Prompt Configuration
 
