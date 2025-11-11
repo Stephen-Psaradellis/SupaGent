@@ -426,10 +426,6 @@ class LeadPipelineSettings(BaseModel):
     yelp_dataset_path: Optional[Path] = Field(
         default=Path("pipeline/yelp_academic_dataset_business.json"), alias="YELP_OPEN_DATASET_PATH"
     )
-    HUNTERIO_API_KEY: Optional[str] = Field(default=None, alias="HUNTERIO_API_KEY")
-    hunter_account_id: Optional[str] = Field(
-        default=None, alias="HUNTER_ACCOUNT_ID"
-    )
     APOLLOIO_API_KEY: Optional[str] = Field(default=None, alias="APOLLOIO_API_KEY")
     SCRAPERAPI_API_KEY: Optional[str] = Field(default=None, alias="SCRAPERAPI_API_KEY")
     directory_scrape_targets: List[str] = Field(
@@ -479,8 +475,6 @@ class LeadPipelineSettings(BaseModel):
             "request_retry_attempts": "LEAD_PIPELINE_REQUEST_RETRY_ATTEMPTS",
             "request_retry_backoff": "LEAD_PIPELINE_REQUEST_RETRY_BACKOFF",
             "yelp_dataset_path": "YELP_OPEN_DATASET_PATH",
-            "HUNTERIO_API_KEY": "HUNTERIO_API_KEY",
-            "hunter_account_id": "HUNTER_ACCOUNT_ID",
             "APOLLOIO_API_KEY": "APOLLOIO_API_KEY",
             "SCRAPERAPI_API_KEY": "SCRAPERAPI_API_KEY",
             "directory_scrape_targets": "LEAD_PIPELINE_DIRECTORY_SCRAPE_TARGETS",
@@ -1263,58 +1257,6 @@ class WebDirectoryScraperConnector(LeadSourceConnector):
         return results
 
 
-class HunterEmailEnricher(LeadSourceConnector, LeadEnricher):
-    """Email enrichment using Hunter.io domain search, can also be used as lead source."""
-
-    name = "hunter"
-    SEARCH_URL = "https://api.hunter.io/v2/domain-search"
-
-    def is_configured(self, settings: LeadPipelineSettings) -> bool:
-        return bool(settings.HUNTERIO_API_KEY)
-
-    async def fetch(
-        self, query: LeadQuery, context: LeadPipelineContext
-    ) -> List[Lead]:
-        """Fetch leads using Hunter.io domain search as a lead source."""
-        if not self.is_configured(context.settings):
-            return []
-
-        # Hunter.io doesn't have a company search API - it's for email discovery on known domains
-        # So we can't use it as a lead source, only as an enricher
-        # Return empty list - this source should not be used for discovery
-        print(f"INFO: Hunter.io cannot be used as a lead source (only as enricher). Skipping.")
-        return []
-
-    async def enrich(
-        self, lead: Lead, context: LeadPipelineContext
-    ) -> Lead:
-        if not self.is_configured(context.settings):
-            return lead
-        if not lead.domain or ".placeholder" in lead.domain:
-            return lead
-
-        params = {"domain": lead.domain, "api_key": context.settings.HUNTERIO_API_KEY}
-        cache_key = f"{self.name}:{lead.domain}"
-        try:
-            result = await context.http.get(
-                self.SEARCH_URL,
-                params=params,
-                cache_key=cache_key,
-                cache_ttl=60 * 60 * 12,
-            )
-        except RuntimeError:
-            return lead
-
-        payload = result.json or {}
-        emails = payload.get("data", {}).get("emails", [])
-        for email in emails:
-            value = email.get("value")
-            if value:
-                lead.add_email(value)
-        lead.metadata.setdefault("enrichment", {})["hunter"] = emails
-        return lead
-
-
 class ApolloPeopleSearchConnector(LeadSourceConnector):
     """Search for people using Apollo.io People Search API as a lead source."""
 
@@ -1332,24 +1274,25 @@ class ApolloPeopleSearchConnector(LeadSourceConnector):
             return []
 
         headers = {
-            "Authorization": f"Bearer {context.settings.APOLLOIO_API_KEY}",
             "Content-Type": "application/json",
+            "X-Api-Key": context.settings.APOLLOIO_API_KEY,
         }
 
         # Build search payload based on industry and location
         # Apollo People Search supports various filters
         payload = {
             "page": 1,
-            "per_page": min(query.limit * 2, 100),  # Get more to account for filtering
+            "per_page": min(query.limit * 3, 100),  # Get more to account for filtering - increased multiplier
             "organization_locations": [query.location],
             "q_keywords": query.industry,  # Search using keywords for the industry
             "person_titles": [],  # Could be enhanced to filter by titles
         }
 
-        # Add industry-specific title filters to find relevant people
-        industry_titles = self._get_industry_titles(query.industry)
-        if industry_titles:
-            payload["person_titles"] = industry_titles[:5]  # Limit to avoid too restrictive filtering
+        # For broader search, don't restrict by specific titles - let Apollo find relevant people
+        # The industry keyword search should be sufficient
+        # industry_titles = self._get_industry_titles(query.industry)
+        # if industry_titles:
+        #     payload["person_titles"] = industry_titles[:10]  # Commented out for broader search
 
         cache_key = f"{self.name}:{query.industry}:{query.location}"
         try:
@@ -1375,6 +1318,7 @@ class ApolloPeopleSearchConnector(LeadSourceConnector):
 
         leads = []
         seen_domains = set()
+        filtered_out = {"missing_both": 0, "duplicate_domain": 0}
 
         for person in people[:query.limit]:
             # Extract person details
@@ -1392,36 +1336,45 @@ class ApolloPeopleSearchConnector(LeadSourceConnector):
             if org_domain:
                 org_domain = normalize_domain(org_domain)
 
-            # Skip if we already have a lead from this domain
-            if org_domain and org_domain in seen_domains:
+            # Create lead if we have at least a name or domain
+            if not org_name and not org_domain:
+                filtered_out["missing_both"] += 1
                 continue
 
-            # Create lead from organization data
-            if org_name and org_domain:
-                lead = Lead(
-                    name=org_name,
-                    domain=org_domain,
-                    location=org_location or query.location,
-                    industry=query.industry,
-                    source=self.name,
-                    email=email,  # Primary contact email if available
-                    linkedin_url=linkedin_url,
-                )
+            # Generate placeholder domain if missing
+            if not org_domain and org_name:
+                org_domain = generate_placeholder_domain(org_name, self.name)
 
-                # Add person metadata
-                lead.metadata["apollo_person"] = {
-                    "name": name,
-                    "title": title,
-                    "email": email,
-                    "linkedin_url": linkedin_url,
-                }
+            # Skip if we already have a lead from this domain
+            if org_domain and org_domain in seen_domains:
+                filtered_out["duplicate_domain"] += 1
+                continue
 
-                leads.append(lead)
-                if org_domain:
-                    seen_domains.add(org_domain)
+            # Create lead from organization data (more permissive)
+            lead = Lead(
+                name=org_name or f"Contact at {org_domain}",  # Fallback name
+                domain=org_domain,
+                location=org_location or query.location,
+                industry=query.industry,
+                source=self.name,
+                email=email,  # Primary contact email if available
+                linkedin_url=linkedin_url,
+            )
 
-                if len(leads) >= query.limit:
-                    break
+            # Add person metadata
+            lead.metadata["apollo_person"] = {
+                "name": name,
+                "title": title,
+                "email": email,
+                "linkedin_url": linkedin_url,
+            }
+
+            leads.append(lead)
+            if org_domain:
+                seen_domains.add(org_domain)
+
+            if len(leads) >= query.limit:
+                break
 
         logger.info(f"Apollo People Search generated {len(leads)} leads")
         return leads
@@ -1714,7 +1667,6 @@ class LeadGenerator:
             for connector in [
                 YelpOpenDatasetConnector(),
                 WebDirectoryScraperConnector(),
-                HunterEmailEnricher(),
                 ApolloEnricher(),
                 ApolloPeopleSearchConnector(),
             ]
@@ -1722,9 +1674,8 @@ class LeadGenerator:
         self.enrichers: Dict[str, LeadEnricher] = {
             enricher.name: enricher
             for enricher in [
-                HunterEmailEnricher(),
                 ApolloEnricher(),
-                WebsiteEmailCrawler(),
+                # WebsiteEmailCrawler(),  # Temporarily disabled - causes timeouts
             ]
         }
 
