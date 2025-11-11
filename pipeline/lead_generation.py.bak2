@@ -1546,6 +1546,11 @@ class LeadGenerator:
             discovered: List[Lead] = []
             for i, result in enumerate(discovery_results):
                 source_name = active_sources[i] if i < len(active_sources) else "unknown"
+            # Execute Apollo contact workflow as default step
+            apollo_leads = await self._run_apollo_workflow(deduped, context)
+            if apollo_leads:
+                deduped.extend(apollo_leads)
+                deduped = self._deduplicate(deduped)  # Deduplicate again after adding Apollo leads
                 print(f"DEBUG: After Apollo workflow: {len(deduped)} leads")
                 if isinstance(result, Exception):
                     print(f"WARNING: Lead source '{source_name}' execution error: {result}")
