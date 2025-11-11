@@ -176,35 +176,51 @@ class EmailSender:
             logger.error("❌ ElasticEmail API key not configured")
             return None
 
-        url = "https://api.elasticemail.com/v2/email/send"
+        url = "https://api.elasticemail.com/v4/emails"
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/json",
+            "X-ElasticEmail-ApiKey": api_key
         }
 
-        # Build email data
+        # Build email data in v4 format
         email_data = {
-            "apikey": api_key,
-            "from": self.config["from_email"],
-            "fromName": self.config["from_name"],
-            "to": template["recipient_email"],
-            "subject": template["subject"],
-            "bodyHtml": self._convert_text_to_html(template["body"]),
-            "bodyText": template["body"],  # Include plain text version
+            "Recipients": [
+                {
+                    "Email": template["recipient_email"]
+                }
+            ],
+            "Content": {
+                "From": f"{self.config['from_name']} <{self.config['from_email']}>",
+                "Subject": template["subject"],
+                "Body": [
+                    {
+                        "ContentType": "HTML",
+                        "Content": self._convert_text_to_html(template["body"]),
+                        "Charset": "utf-8"
+                    },
+                    {
+                        "ContentType": "PlainText",
+                        "Content": template["body"],
+                        "Charset": "utf-8"
+                    }
+                ]
+            }
         }
 
-        # Add tracking tags
-        email_data["tag"] = template["domain"]
+        # Add tracking tags if domain is available
+        if template.get("domain"):
+            email_data["Content"]["Tag"] = template["domain"]
 
         try:
-            response = self.session.post(url, headers=headers, data=email_data, timeout=30)
+            response = self.session.post(url, headers=headers, json=email_data, timeout=30)
 
             if response.status_code == 200:
                 result = response.json()
-                if result.get("success"):
-                    # Return message ID in expected format
-                    return {"message_id": result.get("data", {}).get("messageid")}
+                # v4 API returns transactionid in the response
+                if "transactionid" in result:
+                    return {"message_id": result["transactionid"]}
                 else:
-                    logger.error(f"ElasticEmail API error: {result.get('error')}")
+                    logger.error(f"ElasticEmail API error: Missing transactionid in response: {result}")
                     return None
             else:
                 logger.error(f"ElasticEmail API error: {response.status_code} - {response.text}")

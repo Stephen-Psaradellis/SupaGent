@@ -374,7 +374,7 @@ class TestEmailSender(unittest.TestCase):
         """Test ElasticEmail sending."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"success": True, "data": {"messageid": "test_message_id"}}
+        mock_response.json.return_value = {"transactionid": "test_transaction_id"}
         mock_session.return_value.post.return_value = mock_response
 
         template = {
@@ -387,7 +387,7 @@ class TestEmailSender(unittest.TestCase):
         result = self.sender._send_via_elasticemail(template)
 
         self.assertIsNotNone(result)
-        self.assertEqual(result["message_id"], "test_message_id")
+        self.assertEqual(result["message_id"], "test_transaction_id")
 
     def test_html_conversion(self):
         """Test plain text to HTML conversion."""
