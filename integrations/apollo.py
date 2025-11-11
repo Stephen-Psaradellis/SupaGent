@@ -16,7 +16,7 @@ The connector uses the following API endpoints:
 - POST https://api.apollo.io/api/v1/contacts/bulk_create (bulk create contacts)
 
 Required configuration:
-- APOLLO_API_KEY environment variable or config setting
+- APOLLOIO_API_KEY environment variable or config setting
 - Industry parameter for search filtering
 - Location parameter (currently hardcoded to Chicago as per requirements)
 """
@@ -79,17 +79,17 @@ class ApolloSearchFilters:
     job_titles: List[str]
     industry_keywords: str
     location: str
-    page: int = 1
-    per_page: int = 100
+    per_page: int
+    page: int
 
     def to_payload(self) -> Dict[str, Any]:
         """Convert filters to API payload format."""
         return {
-            "page": self.page,
-            "per_page": self.per_page,
             "person_titles": self.job_titles,
             "q_keywords": self.industry_keywords,
             "organization_locations": [self.location],
+            "page": self.page,
+            "per_page": self.per_page,
         }
 
 
@@ -116,18 +116,18 @@ class ApolloConnector:
 
         Args:
             api_key: Apollo.io API key. If not provided, will attempt to get from
-                    APOLLO_API_KEY environment variable or config.
+                    APOLLOIO_API_KEY environment variable or config.
         """
         self.api_key = api_key or self._get_api_key()
         if not self.api_key:
-            raise ValueError("Apollo API key is required. Set APOLLO_API_KEY environment variable.")
+            raise ValueError("Apollo API key is required. Set APOLLOIO_API_KEY environment variable.")
 
         self.http_client = get_http_client(timeout=30.0)
 
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment or config."""
         import os
-        api_key = os.getenv("APOLLO_API_KEY")
+        api_key = os.getenv("APOLLOIO_API_KEY")
         if not api_key:
             try:
                 config = get_config()
@@ -169,11 +169,13 @@ class ApolloConnector:
             job_titles=job_titles,
             industry_keywords=industry,
             location=location,
-            per_page=min(limit, 100),  # Apollo limits to 100 per page
+            page=1,
+            per_page=min(limit, 100) # Apollo limits to 100 per page
         )
 
         contacts = []
         seen_emails: Set[str] = set()
+        total_raw_results = 0
 
         while len(contacts) < limit:
             payload = filters.to_payload()
@@ -194,6 +196,7 @@ class ApolloConnector:
                 if not people:
                     break
 
+                total_raw_results += len(people)
                 logger.info(f"Found {len(people)} people in page {filters.page}")
 
                 for person_data in people:
@@ -201,6 +204,7 @@ class ApolloConnector:
 
                     # Skip if we've already seen this email
                     if contact.email and contact.email in seen_emails:
+                        logger.debug(f"Skipping duplicate email: {contact.email}")
                         continue
 
                     contacts.append(contact)
@@ -222,7 +226,7 @@ class ApolloConnector:
                 logger.error(f"Error searching Apollo people: {e}")
                 break
 
-        logger.info(f"Total people found: {len(contacts)}")
+        logger.info(f"Total people found: {len(contacts)} (from {total_raw_results} raw results, filtered to {len(seen_emails)} unique emails)")
         return contacts[:limit]
 
     async def search_existing_contacts(
@@ -253,8 +257,6 @@ class ApolloConnector:
             email_batch = emails[i : i + batch_size]
 
             payload = {
-                "page": 1,
-                "per_page": min(len(email_batch), 100),
                 "q_emails": email_batch,
             }
 

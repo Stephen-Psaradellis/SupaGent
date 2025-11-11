@@ -27,6 +27,13 @@ The implementation emphasizes:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path so we can import local modules
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import abc
 import asyncio
 import hashlib
@@ -1311,6 +1318,87 @@ class WebsiteEmailCrawler(LeadEnricher):
             lead.add_email(email)
 
 
+class ApolloLeadSourceConnector(LeadSourceConnector):
+    """Apollo.io lead source connector for discovering business contacts."""
+
+    name = "apollo"
+
+    def is_configured(self, settings: LeadPipelineSettings) -> bool:
+        """Check if Apollo API key is configured."""
+        import os
+        api_key = os.getenv("APOLLOIO_API_KEY") or getattr(settings, "apollo_api_key", None)
+        return bool(api_key)
+
+    async def fetch(
+        self, query: LeadQuery, context: LeadPipelineContext
+    ) -> List[Lead]:
+        """Fetch leads from Apollo.io using people search and enrichment workflow."""
+        if not self.is_configured(context.settings):
+            logger.info("Skipping Apollo – API key not configured.")
+            return []
+
+        try:
+            # Import Apollo connector
+            from integrations.apollo import ApolloConnector
+
+            # Initialize Apollo connector
+            connector = ApolloConnector()
+
+            logger.info(f"Searching and enriching Apollo contacts for {query.industry} in {query.location}")
+
+            # Use the full workflow to search, enrich, and create contacts
+            # This ensures emails are discovered during enrichment
+            workflow_result = await connector.execute_workflow(
+                industry=query.industry,
+                location=query.location,
+                limit=query.limit
+            )
+
+            if not workflow_result.get("success", False):
+                logger.warning(f"Apollo workflow failed: {workflow_result.get('message', 'Unknown error')}")
+                return []
+
+            created_contacts = workflow_result.get("created_contacts", [])
+            logger.info(f"Apollo workflow created {len(created_contacts)} contacts")
+
+            # Convert created contacts back to leads
+            # Only include contacts that have email addresses (should be all after enrichment)
+            leads = []
+            for contact_data in created_contacts:
+                email = contact_data.get("email")
+                if not email:
+                    # Skip contacts without emails as per requirements
+                    continue
+
+                lead = Lead(
+                    name=contact_data.get("name", contact_data.get("first_name", "Unknown")),
+                    domain=contact_data.get("organization_website", ""),
+                    location=query.location,
+                    industry=query.industry,
+                    email=email,
+                    phone=None,  # Apollo might not provide phone
+                    description=f"{contact_data.get('title', '')} at {contact_data.get('organization_name', '')}".strip(),
+                    source="apollo",
+                    linkedin_url=contact_data.get("linkedin_url"),
+                    score=0.8,  # Apollo contacts are generally high quality
+                    confidence=0.9,
+                    tags={"apollo_contact", "apollo_workflow"},
+                    metadata={
+                        "apollo_contact_data": contact_data,
+                        "apollo_workflow_stats": workflow_result.get("stats", {}),
+                        "apollo_source": True
+                    }
+                )
+                leads.append(lead)
+
+            logger.info(f"Converted {len(leads)} Apollo contacts to leads (with emails)")
+            return leads
+
+        except Exception as e:
+            logger.warning(f"Apollo workflow failed: {e}")
+            return []
+
+
 class LeadScorer:
     """Score leads based on completeness, contactability, and relevance."""
 
@@ -1343,11 +1431,16 @@ class LeadScorer:
 class LeadFilter:
     """Filter and rank leads for export readiness."""
 
-    def __init__(self, min_score: float = DEFAULT_SCORE_THRESHOLD):
+    def __init__(self, min_score: float = DEFAULT_SCORE_THRESHOLD, require_email: bool = True):
         self.min_score = min_score
+        self.require_email = require_email
 
     def filter(self, leads: Sequence[Lead], limit: int) -> List[Lead]:
         """Return the highest scoring leads within the requested limit."""
+        # First filter out leads without emails if required
+        if self.require_email:
+            leads = [lead for lead in leads if lead.email or lead.emails]
+
         sorted_leads = sorted(leads, key=lambda lead: lead.score, reverse=True)
         filtered = [lead for lead in sorted_leads if lead.score >= self.min_score]
         if not filtered:
@@ -1412,6 +1505,7 @@ class LeadGenerator:
             for connector in [
                 YelpOpenDatasetConnector(),
                 WebDirectoryScraperConnector(),
+                ApolloLeadSourceConnector(),
 
 
             ]
@@ -1546,7 +1640,6 @@ class LeadGenerator:
             discovered: List[Lead] = []
             for i, result in enumerate(discovery_results):
                 source_name = active_sources[i] if i < len(active_sources) else "unknown"
-                print(f"DEBUG: After Apollo workflow: {len(deduped)} leads")
                 if isinstance(result, Exception):
                     print(f"WARNING: Lead source '{source_name}' execution error: {result}")
                     logger.warning("Lead source '%s' execution error: %s", source_name, result)

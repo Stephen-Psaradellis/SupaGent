@@ -21,7 +21,7 @@ from integrations import ApolloConnector
 # Initialize the connector
 connector = ApolloConnector(api_key="your_api_key_here")
 
-# Or set APOLLO_API_KEY environment variable and use:
+# Or set APOLLOIO_API_KEY environment variable and use:
 connector = ApolloConnector()
 
 # Execute the complete workflow
@@ -71,7 +71,7 @@ Set your Apollo.io API key using one of these methods:
 
 1. **Environment Variable**:
    ```bash
-   export APOLLO_API_KEY="your_api_key_here"
+   export APOLLOIO_API_KEY="your_api_key_here"
    ```
 
 2. **Direct Parameter**:
