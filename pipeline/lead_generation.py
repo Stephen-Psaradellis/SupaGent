@@ -331,6 +331,17 @@ class Lead:
     emails: Set[str] = field(default_factory=set)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # Email outreach tracking fields
+    email_outreach_status: str = "not_contacted"  # 'not_contacted', 'contacted', 'responded', 'converted'
+    email_outreach_date: Optional[datetime] = None
+    email_template_used: Optional[str] = None
+    email_message_id: Optional[str] = None
+    email_follow_up_count: int = 0
+    email_last_follow_up: Optional[datetime] = None
+    email_bounced: bool = False
+    email_complained: bool = False
+    email_unsubscribed: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert lead into a serializable dictionary."""
         return {
@@ -352,6 +363,15 @@ class Lead:
             "tags": sorted(self.tags),
             "emails": sorted(self.emails),
             "metadata": self.metadata,
+            "email_outreach_status": self.email_outreach_status,
+            "email_outreach_date": self.email_outreach_date.isoformat() if self.email_outreach_date else None,
+            "email_template_used": self.email_template_used,
+            "email_message_id": self.email_message_id,
+            "email_follow_up_count": self.email_follow_up_count,
+            "email_last_follow_up": self.email_last_follow_up.isoformat() if self.email_last_follow_up else None,
+            "email_bounced": self.email_bounced,
+            "email_complained": self.email_complained,
+            "email_unsubscribed": self.email_unsubscribed,
         }
 
     @classmethod
@@ -376,6 +396,15 @@ class Lead:
             tags=set(data.get("tags", [])),
             emails=set(data.get("emails", [])),
             metadata=data.get("metadata", {}),
+            email_outreach_status=data.get("email_outreach_status", "not_contacted"),
+            email_outreach_date=datetime.fromisoformat(data["email_outreach_date"]) if data.get("email_outreach_date") else None,
+            email_template_used=data.get("email_template_used"),
+            email_message_id=data.get("email_message_id"),
+            email_follow_up_count=data.get("email_follow_up_count", 0),
+            email_last_follow_up=datetime.fromisoformat(data["email_last_follow_up"]) if data.get("email_last_follow_up") else None,
+            email_bounced=data.get("email_bounced", False),
+            email_complained=data.get("email_complained", False),
+            email_unsubscribed=data.get("email_unsubscribed", False),
         )
 
     def get_hash(self) -> str:

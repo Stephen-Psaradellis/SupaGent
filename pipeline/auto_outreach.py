@@ -1,8 +1,8 @@
 """
-Growth Automation Pipeline - Complete Lead Gen Flywheel
+Growth Automation Pipeline - Complete Outreach Flywheel
 
-Orchestrates the entire growth automation process:
-1. Generate leads from target verticals
+Orchestrates the growth automation process for existing leads:
+1. Load existing leads from leads directory
 2. Scrape and vectorize business data
 3. Create personalized voice agents
 4. Compose cold outreach emails
@@ -11,7 +11,8 @@ Orchestrates the entire growth automation process:
 Usage:
     python pipeline/auto_outreach.py --industry "dentists" --location "Chicago, IL"
 
-This creates a complete lead generation flywheel built on your voice assistant technology.
+This processes existing leads through a complete outreach flywheel built on your voice assistant technology.
+Lead generation should be run separately beforehand to populate the leads directory.
 """
 
 from __future__ import annotations
@@ -22,11 +23,12 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from pipeline.lead_generation import LeadGenerator, Lead
+from pipeline.lead_generation import Lead
 from pipeline.business_intelligence import BusinessIntelligenceLoader
 from pipeline.voice_agent_generator import VoiceAgentGenerator
 from pipeline.email_composer import EmailComposer
 from pipeline.email_sender import EmailSender
+from pipeline.lead_tracker import LeadTracker
 
 # Configure logging
 logging.basicConfig(
@@ -48,20 +50,25 @@ class GrowthAutomationPipeline:
         self.config = self._load_config(config_path)
 
         # Initialize components
-        self.lead_generator = LeadGenerator(self.config.get("leads_dir", "pipeline/leads"))
         self.business_loader = BusinessIntelligenceLoader(self.config.get("business_data_dir", "pipeline/business_data"))
         self.agent_generator = VoiceAgentGenerator(
             agents_dir=self.config.get("agents_dir", "pipeline/agents"),
             config_path=self.config.get("agent_templates", "pipeline/config/agent_templates.json"),
-            use_llm=self.config.get("use_llm_agent_prompts", True)
+            use_llm=self.config.get("use_llm_agent_prompts", True),
+            business_data_dir=self.config.get("business_data_dir", "pipeline/business_data")
         )
         self.email_composer = EmailComposer(
             templates_dir=self.config.get("email_templates", "pipeline/config/email_templates"),
-            use_llm=self.config.get("use_llm_email_generation", True)
+            use_llm=self.config.get("use_llm_email_generation", True),
+            business_data_dir=self.config.get("business_data_dir", "pipeline/business_data")
         )
         self.email_sender = EmailSender(
-            self.config.get("emails_dir", "pipeline/emails")
+            self.config.get("emails_dir", "pipeline/emails"),
+            leads_dir=self.config.get("leads_dir", "pipeline/leads")
         )
+
+        # Initialize lead tracker
+        self.lead_tracker = LeadTracker(self.config.get("leads_dir", "pipeline/leads"))
 
         logger.info("🚀 Growth Automation Pipeline initialized")
 
@@ -92,6 +99,68 @@ class GrowthAutomationPipeline:
 
         return config
 
+    def _load_existing_leads(self, leads_dir: Optional[str] = None) -> List[Lead]:
+        """Load existing leads from the leads directory.
+
+        Args:
+            leads_dir: Directory containing leads (defaults to config value)
+
+        Returns:
+            List of Lead objects loaded from JSON files
+        """
+        import json
+        leads_dir = leads_dir or self.config.get("leads_dir", "pipeline/leads")
+        leads_path = Path(leads_dir)
+        leads = []
+
+        if not leads_path.exists():
+            logger.warning(f"Leads directory does not exist: {leads_path}")
+            return leads
+
+        # Find all JSON files in the leads directory structure, excluding config files
+        json_files = []
+        for json_file in leads_path.glob("**/*.json"):
+            # Skip config files in the config subdirectory
+            if "config" in str(json_file):
+                continue
+            json_files.append(json_file)
+
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    lead_data_list = json.load(f)
+
+                for lead_data in lead_data_list:
+                    # Convert dict back to Lead object
+                    lead = Lead(
+                        name=lead_data["name"],
+                        domain=lead_data["domain"],
+                        location=lead_data.get("location"),
+                        industry=lead_data.get("industry"),
+                        email=lead_data.get("email"),
+                        phone=lead_data.get("phone"),
+                        description=lead_data.get("description"),
+                        source=lead_data.get("source", "unknown"),
+                        linkedin_url=lead_data.get("linkedin_url"),
+                        yelp_url=lead_data.get("yelp_url"),
+                        google_maps_url=lead_data.get("google_maps_url"),
+                        bbb_url=lead_data.get("bbb_url"),
+                        crunchbase_url=lead_data.get("crunchbase_url"),
+                        score=lead_data.get("score", 0.0),
+                        confidence=lead_data.get("confidence", 0.0),
+                        tags=set(lead_data.get("tags", [])),
+                        emails=set(lead_data.get("emails", [])),
+                        metadata=lead_data.get("metadata", {})
+                    )
+                    leads.append(lead)
+
+            except Exception as e:
+                logger.warning(f"Failed to load leads from {json_file}: {e}")
+                continue
+
+        logger.info(f"Loaded {len(leads)} leads from {len(json_files)} files")
+        return leads
+
     def run_full_pipeline(
         self,
         industry: str,
@@ -113,7 +182,7 @@ class GrowthAutomationPipeline:
         results = {
             "industry": industry,
             "location": location,
-            "leads_generated": 0,
+            "leads_loaded": 0,
             "businesses_processed": 0,
             "agents_created": 0,
             "emails_composed": 0,
@@ -124,25 +193,32 @@ class GrowthAutomationPipeline:
         max_leads = max_leads or self.config["max_leads"]
         send_emails = send_emails if send_emails is not None else self.config["send_emails"]
 
-        logger.info(f"🎯 Starting growth automation for {industry} in {location}")
+        logger.info(f"🎯 Starting growth automation pipeline")
 
         try:
-            # Step 1: Generate leads
-            logger.info("🔍 Step 1: Generating leads...")
-            leads = self.lead_generator.generate_leads(
+            # Step 1: Load eligible leads for outreach
+            logger.info("🔍 Step 1: Loading eligible leads for outreach...")
+            leads = self.lead_tracker.get_eligible_leads_for_outreach(
                 industry=industry,
                 location=location,
-                limit=max_leads
+                exclude_bounced=True,
+                exclude_complained=True,
+                exclude_unsubscribed=True
             )
-            results["leads_generated"] = len(leads)
-            logger.info(f"✅ Generated {len(leads)} leads")
+
+            # Apply max_leads limit
+            if max_leads and len(leads) > max_leads:
+                leads = leads[:max_leads]
+
+            results["leads_loaded"] = len(leads)
+            logger.info(f"✅ Found {len(leads)} eligible leads for outreach")
 
             if not leads:
-                logger.warning("⚠️ No leads generated, ending pipeline")
+                logger.warning("⚠️ No eligible leads found for outreach, ending pipeline")
                 return results
 
             # Step 2: Process each business
-            processed_domains = []
+            processed_leads = []
             agent_count = 0
             email_count = 0
 
@@ -150,21 +226,16 @@ class GrowthAutomationPipeline:
                 logger.info(f"🏢 Step 2: Processing business {i}/{len(leads)}: {lead.name}")
 
                 try:
-                    # Check if business has email (required for outreach)
-                    if not lead.email:
-                        logger.warning(f"⚠️ Skipping {lead.name} - no email found")
-                        continue
-
                     # 2a: Scrape and vectorize business data
-                    logger.info(f"   📊 Scraping and vectorizing {lead.domain}...")
-                    success = self.business_loader.process_business(
-                        lead.domain,
+                    logger.info(f"   📊 Gathering intelligence for {lead.name}...")
+                    intelligence = self.business_loader.process_lead(
+                        lead,
                         self.config["max_pages_per_business"]
                     )
 
-                    if not success:
-                        logger.warning(f"   ❌ Failed to process business data for {lead.domain}")
-                        results["errors"].append(f"Business processing failed: {lead.domain}")
+                    if not intelligence:
+                        logger.warning(f"   ❌ Failed to gather business intelligence for {lead.domain or lead.name}")
+                        results["errors"].append(f"Business processing failed: {lead.domain or lead.name}")
                         continue
 
                     # 2b: Generate voice agent
@@ -173,12 +244,15 @@ class GrowthAutomationPipeline:
                         domain=lead.domain,
                         business_name=lead.name,
                         industry=lead.industry or industry,
+                        lead=lead,
+                        business_intelligence=intelligence,
                         create_elevenlabs=self.config["create_elevenlabs_agents"]
                     )
 
                     if agent_config:
                         agent_count += 1
-                        logger.info(f"   ✅ Created agent: {agent_config.agent_name}")
+                        agent_name = agent_config.request_payload.get("name", lead.name)
+                        logger.info(f"   ✅ Prepared agent payload: {agent_name}")
                     else:
                         logger.warning(f"   ⚠️ Failed to create agent for {lead.domain}")
                         results["errors"].append(f"Agent creation failed: {lead.domain}")
@@ -195,42 +269,42 @@ class GrowthAutomationPipeline:
                         results["errors"].append(f"Email composition failed: {lead.domain}")
                         continue
 
-                    processed_domains.append(lead.domain)
+                    processed_leads.append(lead)
 
                 except Exception as e:
                     logger.error(f"   ❌ Error processing {lead.name}: {e}")
                     results["errors"].append(f"Business processing error for {lead.domain}: {str(e)}")
                     continue
 
-            results["businesses_processed"] = len(processed_domains)
+            results["businesses_processed"] = len(processed_leads)
             results["agents_created"] = agent_count
             results["emails_composed"] = email_count
 
             # Step 3: Send emails if enabled
-            if send_emails and processed_domains:
+            if send_emails and processed_leads:
                 logger.info("📤 Step 3: Sending emails...")
 
                 if not send_emails:
                     logger.warning("⚠️ Email sending disabled by default. Use --send-emails to enable.")
                     logger.info("💡 To enable: python auto_outreach.py --send-emails ...")
                 else:
-                    email_results = self.email_sender.send_bulk_emails(
-                        processed_domains,
+                    email_results = self.email_sender.send_bulk_emails_to_leads(
+                        processed_leads,
                         self.config["batch_size"],
                         self.config["delay_seconds"]
                     )
 
                     sent_count = sum(1 for success in email_results.values() if success)
                     results["emails_sent"] = sent_count
-                    logger.info(f"✅ Sent {sent_count}/{len(processed_domains)} emails")
+                    logger.info(f"✅ Sent {sent_count}/{len(processed_leads)} emails")
 
-                    if sent_count < len(processed_domains):
+                    if sent_count < len(processed_leads):
                         failed_domains = [d for d, success in email_results.items() if not success]
                         results["errors"].extend([f"Email send failed: {d}" for d in failed_domains])
 
             # Final summary
             logger.info("🎉 Pipeline execution complete!")
-            logger.info(f"   📊 Leads generated: {results['leads_generated']}")
+            logger.info(f"   📊 Leads loaded: {results['leads_loaded']}")
             logger.info(f"   🏢 Businesses processed: {results['businesses_processed']}")
             logger.info(f"   🤖 Agents created: {results['agents_created']}")
             logger.info(f"   📧 Emails composed: {results['emails_composed']}")
@@ -249,25 +323,6 @@ class GrowthAutomationPipeline:
             logger.error(f"❌ Pipeline execution failed: {e}")
             results["errors"].append(f"Pipeline failure: {str(e)}")
             return results
-
-    def run_lead_generation_only(
-        self,
-        industry: str,
-        location: str,
-        max_leads: Optional[int] = None
-    ) -> List[Lead]:
-        """Run only the lead generation step.
-
-        Args:
-            industry: Target industry
-            location: Target location
-            max_leads: Maximum leads to generate
-
-        Returns:
-            List of generated leads
-        """
-        max_leads = max_leads or self.config["max_leads"]
-        return self.lead_generator.generate_leads(industry, location, max_leads)
 
     def run_business_processing_only(self, domains: List[str]) -> dict:
         """Run only business processing steps (scraping, agents, emails).
@@ -290,8 +345,17 @@ class GrowthAutomationPipeline:
                 logger.info(f"🏢 Processing {domain}...")
 
                 # Scrape and vectorize
-                success = self.business_loader.process_business(domain, self.config["max_pages_per_business"])
-                if not success:
+                placeholder_lead = Lead(
+                    name=domain,
+                    domain=domain,
+                    industry="general",
+                    source="manual_import",
+                )
+                intelligence = self.business_loader.process_lead(
+                    placeholder_lead,
+                    self.config["max_pages_per_business"]
+                )
+                if not intelligence:
                     results["errors"].append(f"Scraping failed: {domain}")
                     continue
 
@@ -300,6 +364,8 @@ class GrowthAutomationPipeline:
                     domain=domain,
                     business_name=domain.replace(".", " ").title(),  # Placeholder name
                     industry="general",
+                    lead=placeholder_lead,
+                    business_intelligence=intelligence,
                     create_elevenlabs=self.config["create_elevenlabs_agents"]
                 )
 
@@ -318,18 +384,40 @@ class GrowthAutomationPipeline:
 
         return results
 
+    def generate_outreach_report(self, output_file: str, industry: Optional[str] = None, location: Optional[str] = None) -> None:
+        """Generate comprehensive outreach report.
+
+        Args:
+            output_file: Path to output report file
+            industry: Filter by industry
+            location: Filter by location
+        """
+        logger.info("📊 Generating outreach report...")
+
+        # Generate report using lead tracker
+        self.lead_tracker.export_outreach_report(output_file)
+
+        # Also log some metrics
+        metrics = self.lead_tracker.get_outreach_metrics(industry=industry, location=location)
+
+        logger.info("📈 Outreach Metrics Summary:")
+        logger.info(f"   Total Leads: {metrics.total_leads}")
+        logger.info(f"   Contacted: {metrics.contacted_leads}")
+        logger.info(f"   Response Rate: {metrics.response_rate:.1%}")
+        logger.info(f"   Conversion Rate: {metrics.conversion_rate:.1%}")
+        logger.info(f"   Bounce Rate: {metrics.bounce_rate:.1%}")
+
+        logger.info(f"✅ Report exported to {output_file}")
+
 
 def main():
     """CLI interface for the growth automation pipeline."""
     parser = argparse.ArgumentParser(
-        description="Growth Automation Pipeline - Complete Lead Gen Flywheel",
+        description="Growth Automation Pipeline - Complete Outreach Flywheel",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Generate leads only
-  python pipeline/auto_outreach.py --industry "dentists" --location "Chicago, IL" --leads-only
-
-  # Full pipeline (no email sending)
+  # Full pipeline (no email sending) - processes existing leads
   python pipeline/auto_outreach.py --industry "dentists" --location "Chicago, IL"
 
   # Full pipeline with email sending (CAUTION: actually sends emails!)
@@ -337,17 +425,22 @@ Examples:
 
   # Process specific domains
   python pipeline/auto_outreach.py --domains-file domains.txt --process-only
+
+  # Generate outreach report
+  python pipeline/auto_outreach.py --report outreach_report.json --industry "dentists"
+
+Note: Run lead generation separately first to populate the leads directory.
         """
     )
 
     parser.add_argument("--industry", help="Target industry (e.g., 'dentists')")
     parser.add_argument("--location", help="Target location (e.g., 'Chicago, IL')")
-    parser.add_argument("--max-leads", type=int, default=10, help="Maximum leads to generate")
-    parser.add_argument("--leads-only", action="store_true", help="Generate leads only")
+    parser.add_argument("--max-leads", type=int, default=10, help="Maximum leads to process")
     parser.add_argument("--process-only", action="store_true", help="Process domains only (no lead gen)")
     parser.add_argument("--domains-file", help="File containing domains to process")
     parser.add_argument("--send-emails", action="store_true", help="Actually send emails (CAUTION!)")
     parser.add_argument("--config", help="Pipeline configuration file")
+    parser.add_argument("--report", help="Generate outreach report to specified file")
     parser.add_argument("--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args()
@@ -356,24 +449,17 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Validate arguments
-    if not args.leads_only and not args.process_only:
-        if not args.industry or not args.location:
-            parser.error("Must specify --industry and --location for full pipeline, or use --leads-only or --process-only")
-
-    if args.process_only and not args.domains_file:
-        parser.error("--process-only requires --domains-file")
+    if not args.process_only:
+        # For full pipeline, industry and location are optional filters
+        pass
+    else:
+        if not args.domains_file:
+            parser.error("--process-only requires --domains-file")
 
     try:
         pipeline = GrowthAutomationPipeline(args.config)
 
-        if args.leads_only:
-            # Lead generation only
-            leads = pipeline.run_lead_generation_only(args.industry, args.location, args.max_leads)
-            print(f"Generated {len(leads)} leads:")
-            for lead in leads:
-                print(f"- {lead.name} ({lead.domain}) - {lead.email or 'No email'}")
-
-        elif args.process_only:
+        if args.process_only:
             # Business processing only
             try:
                 with open(args.domains_file, 'r', encoding='utf-8') as f:
@@ -410,7 +496,7 @@ Examples:
             )
 
             print("\n🎉 Pipeline Complete!")
-            print(f"Leads Generated: {results['leads_generated']}")
+            print(f"Leads Loaded: {results['leads_loaded']}")
             print(f"Businesses Processed: {results['businesses_processed']}")
             print(f"Voice Agents Created: {results['agents_created']}")
             print(f"Emails Composed: {results['emails_composed']}")
@@ -422,6 +508,10 @@ Examples:
                     print(f"- {error}")
                 if len(results['errors']) > 5:
                     print(f"... and {len(results['errors']) - 5} more")
+
+        # Generate report if requested
+        if args.report:
+            pipeline.generate_outreach_report(args.report, args.industry, args.location)
 
     except KeyboardInterrupt:
         print("\n⏹️  Pipeline interrupted by user")

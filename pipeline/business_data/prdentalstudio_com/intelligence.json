@@ -1,0 +1,191 @@
+{
+  "lead_profile": {
+    "name": "Kaori Ema",
+    "title": "Dentist/Business Owner",
+    "company": "Printers Row Dental Studio",
+    "industry": "dentist",
+    "location": "Chicago",
+    "description": "Dentist/Business Owner at Printers Row Dental Studio",
+    "primary_email": "smile@prdentalstudio.com",
+    "score": 0.6,
+    "confidence": 0.7,
+    "domain": "prdentalstudio.com",
+    "source": "apollo",
+    "tags": [
+      "apollo_contact",
+      "apollo_workflow"
+    ]
+  },
+  "metadata_insights": {
+    "apollo_contact": {
+      "title": "Dentist/Business Owner",
+      "organization_name": "Printers Row Dental Studio",
+      "organization_id": "5b8603f8f874f70155b20b62",
+      "city": "Chicago",
+      "state": "Illinois",
+      "country": "United States",
+      "headline": "Doctor of Dental Surgery; Master of the Academy of General Dentistry; Cosmetic Dentist and Practice Owner",
+      "time_zone": "America/Chicago",
+      "contact_stage_id": "69114334a5dfc000118df0d8",
+      "owner_id": "6911433aa5dfc000118df38c",
+      "contact_emails": [
+        {
+          "email": "smile@prdentalstudio.com",
+          "status": "verified",
+          "source": "User Managed",
+          "confidence": null
+        }
+      ],
+      "phone_numbers": [
+        {
+          "number": "+1 312-435-0411",
+          "type": "work_hq",
+          "status": "no_status"
+        }
+      ]
+    },
+    "apollo_workflow_stats": {
+      "people_found": 29,
+      "existing_contacts": 0,
+      "new_people": 29,
+      "enriched": 18,
+      "created": 18,
+      "duration_seconds": 3.086738
+    }
+  },
+  "hunter_enrichment": {
+    "domain_search": {
+      "organization": "PR Dental Studio",
+      "country": null,
+      "state": null,
+      "emails": [
+        {
+          "value": "smile@prdentalstudio.com",
+          "type": "generic",
+          "position": null,
+          "confidence": 60,
+          "first_name": null,
+          "last_name": null
+        }
+      ],
+      "pattern": null,
+      "disposable": false,
+      "webmail": false
+    },
+    "email_finder": {
+      "email": null,
+      "score": null,
+      "verified": null
+    }
+  },
+  "content_summaries": {
+    "services": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nschedule appointment\nGeneral Dentistry\nKeep your smile for life with preventative and comprehensive treatments.\nProphylaxis (Teeth Cleaning)\nFluoride Treatments\ndigital X-Rays\nOral Cancer Screening\nOcclusal Exam\nDental Emergencies\nTooth Colored Fillings\nDental Sealants\nRoot Canal Therapy\nPeriodontal Care\nSedation Dentistry\nTooth Extractions\nWisdom Tooth Removal\nNightguards for Grinding\nMouthguards\nTMJ Treatment\nSleep Apnea Solutions\nLaser Dentistry\nIn-office 3D Printing\nCosmetic & Restorative Solutions\nSave and transform your smile with handcrafted treatment options.\nInvisalignÂ® Orthodontic Solutions\nDental Implants\nImplant-supported Dentures\nSnap-On Smiles\nVITA EasyshadeÂ® for Tooth Color Matching\nPorcelain Veneers\nKOR in-office Whitening\nSpecialty technology\nTake-home Teeth Whitening\nComposite Bonding\nGum Contouring\nBone & Sinus Grafting\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nDental Implants\nschedule appointment\nWhen it comes to replacing missing teeth, you have many replacement options. Dental implants are a ",
+    "general": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nwith your Chicago Dentist\nschedule appointment\nRelax as we help you look, feel, and be your best.\nthe printers row difference\nthe guest experience\npatient experience\nAs a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.\nMeet Your Smile Artist\nComprehensive. Cosmetic. Restorative.\nUnmatched smile solutions for the windy city.\nSMILE SERVICES\nsmile gallery\nWant a new smile?\nAfter a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.\nchicago veneers\nâA wonderful experienceâ\nA wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister's wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!\npatient reviews\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nwith your "
+  },
+  "content_highlights": {
+    "services": [
+      "Weâll be in touch soon."
+    ],
+    "general": [
+      "the printers row difference\nthe guest experience\npatient experience\nAs a Master in the Academy of General Dentistry, Dr.",
+      "Ema is in the top 2% of dentists.",
+      "Meet Your Smile Artist\nComprehensive."
+    ]
+  },
+  "keyword_signals": {
+    "top_keywords": [
+      "smile",
+      "with",
+      "your",
+      "appointment",
+      "patient",
+      "schedule",
+      "veneers",
+      "chicago",
+      "connect",
+      "printers"
+    ],
+    "total_unique_tokens": 155
+  },
+  "online_presence": {
+    "domain": "prdentalstudio.com",
+    "linkedin_url": "http://www.linkedin.com/in/kaori-ema"
+  },
+  "llm_digest": "Lead Name: Kaori Ema\nTitle: Dentist/Business Owner\nCompany: Printers Row Dental Studio\nIndustry: dentist\nLocation: Chicago\nHunter Organization: PR Dental Studio\nHunter Verified Emails: 1 records\nTop Keywords: smile, with, your, appointment, patient, schedule, veneers\nService Highlights:\n- Weâll be in touch soon.\nApollo Contact Emails:\n- smile@prdentalstudio.com (verified)",
+  "generated_at": 1762900914,
+  "content_sources": {
+    "about": [],
+    "services": [
+      {
+        "url": "https://www.prdentalstudio.com/dental-services",
+        "title": "Cosmetic Family Dentist Chicago, IL | Printers Row Dental",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nschedule appointment\nGeneral Dentistry\nKeep your smile for life with preventative and comprehensive treatments.\nProphylaxis (Teeth Cleaning)\nFluoride Treatments\ndigital X-Rays\nOral Cancer Screening\nOcclusal Exam\nDental Emergencies\nTooth Colored Fillings\nDental Sealants\nRoot Canal Therapy\nPeriodontal Care\nSedation Dentistry\nTooth Extractions\nWisdom Tooth Removal\nNightguards for Grinding\nMouthguards\nTMJ Treatment\nSleep Apnea Solutions\nLaser Dentistry\nIn-office 3D Printing\nCosmetic & Restorative Solutions\nSave and transform your smile with handcrafted treatment options.\nInvisalignÂ® Orthodontic Solutions\nDental Implants\nImplant-supported Dentures\nSnap-On Smiles\nVITA EasyshadeÂ® for Tooth Color Matching\nPorcelain Veneers\nKOR in-office Whitening\nSpecialty technology\nTake-home Teeth Whitening\nComposite Bonding\nGum Contouring\nBone & Sinus Grafting\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "services",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896106",
+          "status_code": "200"
+        }
+      },
+      {
+        "url": "https://www.prdentalstudio.com/dental-services/dental-implants",
+        "title": "Dental Implants | PR Dental Studio",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nDental Implants\nschedule appointment\nWhen it comes to replacing missing teeth, you have many replacement options. Dental implants are a long-term solution to replacing missing teeth, supporting your existing oral structures, and giving you back your freedom to live your life on your terms. When choosing an oral surgeon, it is imperative that you choose someone you trust. At Printers Row Dental Studio, Dr. Ema is highly-trained and experienced and is committed to providing unparalleled patient care, placing the best dental implants Chicago has to offer.\nThere are a number of reasons why you may need implants. If youâre looking for a trusted Chicago dentist, youâve come to the right place. Dr. Ema understands that dental implant surgery can be a great source of anxiety for many people, and she is proud to offer in-office amenities and sedation to make your experience as comfortable and painless as possible.\nWhy Replacing Teeth is Important\nReplacing missing teeth is not a solely cosmetic concern. There are a number of side effects that you can experience if you donât close the gap left by missing teeth, including:\nChanges to the shape of your face\nMore susceptible to tooth decay and gum disease\nChanges to your bite because the surrounding teeth may start to shift\nIf youâre missing even one tooth, it is very important to explore your replacement option in order to preserve your long-term oral health.\nWhat are Dental Implants\nAll on 4 Before\nAll on 4 After\nImplants are posts that Dr. Ema surgically implants into your jawbone to act as a replacement for the root of your tooth. After the dental implant fuses to your jawbone, Dr. Ema will place a crown on top of the implant that will look and feel like a natural tooth.\nBy replacing a missing tooth with aÂ\ndental implant\n, Dr. Ema helps preserve your jawbone and, in turn, the overall structure of your face.Â One of the most effective and least invasive implants we offer at Printers Row Dental Studio is theÂ\nAll-On 4 treatment\nBenefits of Implants\nDental implants are designed to look, feel, and function like natural teeth\nSince the dental implant fuses with your bone, the discomfort of dentures is not a problem\nWith proper care, dental implants will last many years, and, in some cases, they can last the rest of your life\nDental Implants prevent further bone loss and help retain the shape and appearance of your face\nThey are permanent and stable\nNumber of Sessions\nDental implants are applied in three sessions on average. In the first session, a patientâs measurements are taken to create an implant that is perfectly matched to the patientâs jaw so that it fits well and will stay securely in place.\nDuring the next two appointments, multiple sections of the implant are installed. This process happens in separate sessions to make sure each piece of the implant is securely in place before the next piece is added on.\nWithout a session dedicated to measurement, any implant inserted into the jaw will not fit correctly, coming loose or feeling very painful when being used to bite or chew food.\nÂ Pausing in between treatments also allows the patients to heal before the next procedure so that there is no unnecessary damage done or pain caused.\nWhat Should I Expect?\nDental implant surgery includes the placement of the implants and the placement of the crowns over the implants. Dr. Ema will surgically place the posts into your jawbone, where it will fuse with the bone itself, supporting the surrounding bone structure. Once this process is complete, Dr. Ema will attach abutments to the posts. These abutments will hold your permanent crowns.\nTo learn more about the dental implants we offer, visit our\nÂ implants page on our Chicago Veneers site\nWe understand that surgery can be a frightening prospect for some, and at Printers Row Dental Studio, it is our goal to make your experience as stress-free as possible by providing you with our best care. We are here for anything you may need before, during, and after your surgery. Dr. Ema is specially trained to give you the highest quality of care and comfort.\nIf you need to replace missing teeth, donât wait any longerâimplants may be right for you!\nFor dental implants Chicago can trust, call our office today atÂ\n(312) 435-0411\nÂ to schedule your appointment or\nÂ request one online\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "services",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896112",
+          "status_code": "200"
+        }
+      },
+      {
+        "url": "https://www.prdentalstudio.com/dental-services/dentures",
+        "title": "",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nschedule appointment\nDentures are a great option for replacing missing teeth. They can replace anywhere from few to all of your teeth, and can be supported by no teeth, limited teeth, or implants. With our digital denture process and fully supported prostheses, Printers Row Dental Studio offers the latest techniques in denture services. Weâll give you dentures you can wear with confidence!\nAt Printers Row Dental Studio, we are dedicated to transforming your smile into something youâre proud to show off!\nWe offer many cosmetic treatments! Printers Row Dental Studio and Chicago Veneers will give you a smile youâll be proud of! Visit our\nChicago Veneers website\nto learn more about our cosmetic dentistry practice.\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "services",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896113",
+          "status_code": "200"
+        }
+      }
+    ],
+    "team": [],
+    "blog": [],
+    "general": [
+      {
+        "url": "https://prdentalstudio.com",
+        "title": "Dentist in Chicago, IL | Printers Row Dental Studio",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nwith your Chicago Dentist\nschedule appointment\nRelax as we help you look, feel, and be your best.\nthe printers row difference\nthe guest experience\npatient experience\nAs a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.\nMeet Your Smile Artist\nComprehensive. Cosmetic. Restorative.\nUnmatched smile solutions for the windy city.\nSMILE SERVICES\nsmile gallery\nWant a new smile?\nAfter a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.\nchicago veneers\nâA wonderful experienceâ\nA wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister's wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!\npatient reviews\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "general",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896102",
+          "status_code": "200"
+        }
+      },
+      {
+        "url": "https://www.prdentalstudio.com",
+        "title": "Dentist in Chicago, IL | Printers Row Dental Studio",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nWorld Class Smile Care\nwith your Chicago Dentist\nschedule appointment\nRelax as we help you look, feel, and be your best.\nthe printers row difference\nthe guest experience\npatient experience\nAs a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.\nMeet Your Smile Artist\nComprehensive. Cosmetic. Restorative.\nUnmatched smile solutions for the windy city.\nSMILE SERVICES\nsmile gallery\nWant a new smile?\nAfter a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.\nchicago veneers\nâA wonderful experienceâ\nA wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister's wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!\npatient reviews\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "general",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896103",
+          "status_code": "200"
+        }
+      },
+      {
+        "url": "https://www.prdentalstudio.com/difference",
+        "title": "Best patient experience in Chicago, IL | Printers Row Dental Studio",
+        "content": "The Printers Row Difference\nPatient Center\nMeet Your Smile Artist\nSmile Services\nSmile Gallery\nChicago Veneers\nPatient Reviews\nconnect with us\nschedule an appointment\nThe Printers Row Difference\nschedule appointment\nThe Difference\nA bit of luxury\nLike a five-star hotel, you can expect the unexpected with luxurious amenities including Netflix, warm blankets, eye mask, neck pillow, headphones, lavender aromatherapy and sedation options to keep you comfortable.\nA heart for relationships\nDriven by a desire to build lifelong friendships with our patients, we always take our time to listen closely to you and your story.\nA smile artist with world class skill\nAs a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists. Add to that, her teaching experience, AEGD residency, and over 2000 hours of continuing education, and you get stunning smile transformations and unrivaled dental expertise.\nkeep you in charge\nWeâll diagnose, offer a full menu of solutions, and answer all your questions â but you always get to choose the care you want without any pressure from us.\nmodern technology\nTo make your care easier, faster, and more effective, we use leading-edge technology like digital x-rays, 2D and 3D radiography, high-definition photography, gunk-free digital impressions, diode lasers, a digital spectrophotometer for color matching, and more.\nâOVERWHELMED with love, charm, & joy!â\nAnytime you have to visit the dentist, there can be some anxiety. However, anytime I enter Printer's Row Dentall Studio, I am OVERWHELMED with love, charm, and joy! The team is exceptionally hospitable and Dr. Ema is not only one of the most high quality profressionals I've ever had the pleasure to meet, she makes me feel comfortable and safe in her care!\npatient reviews\nCONNECT WITH US\n312.435.0411\nor request an appointment online to set up your first visit. Weâll be in touch soon.\nschedule appointment\nlocation & hours",
+        "content_type": "general",
+        "metadata": {
+          "domain": "prdentalstudio.com",
+          "scraped_at": "1762896104",
+          "status_code": "200"
+        }
+      }
+    ]
+  }
+}

@@ -1,575 +1,340 @@
 """
 Voice Agent Generator for Growth Automation Pipeline.
 
-Creates personalized ElevenLabs voice agents for each business based on
-their scraped content, tone, and industry-specific language patterns.
-
-Features:
-- Auto-generates agent personalities from business content
-- Creates industry-specific system prompts
-- Configures voice settings and conversation styles
-- Integrates with per-business vector stores
-- Generates agent configuration files
+Generates production-ready ElevenLabs Conversational AI agent payloads
+using GPT-4o-mini via OpenRouter combined with structured business
+intelligence collected from the pipeline.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, Optional
+
+import requests
 
 from core.config import get_config
-from pipeline.openrouter_client import OpenRouterClient, BusinessContext, AgentContext
+from pipeline.lead_generation import Lead
+from pipeline.openrouter_client import OpenRouterClient
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+ELEVENLABS_CREATE_AGENT_URL = "https://api.elevenlabs.io/v1/convai/agents/create"
+DEFAULT_VOICE_ID = "j57KDF72L6gxbLk4sOo5"
+DEFAULT_TTS_MODEL_ID = "eleven_turbo_v2_5"
+DEFAULT_AUDIO_FORMAT = "pcm_16000"
 
 
 @dataclass
 class AgentConfig:
-    """Configuration for a business-specific voice agent."""
+    """Runtime representation of an ElevenLabs agent payload."""
 
     domain: str
-    agent_name: str
-    system_prompt: str
-    voice_id: Optional[str] = None
-    personality: str = "professional"
-    industry: str = "general"
-    tone_keywords: List[str] = None
-    conversation_style: str = "helpful"
-    namespace: str = ""
+    request_payload: Dict[str, Any]
+    agent_id: Optional[str] = None
 
-    def __post_init__(self):
-        if self.tone_keywords is None:
-            self.tone_keywords = []
-        if not self.namespace:
-            self.namespace = f"kb:{self.domain}"
-
-    def to_dict(self) -> Dict:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "domain": self.domain,
-            "agent_name": self.agent_name,
-            "system_prompt": self.system_prompt,
-            "voice_id": self.voice_id,
-            "personality": self.personality,
-            "industry": self.industry,
-            "tone_keywords": self.tone_keywords,
-            "conversation_style": self.conversation_style,
-            "namespace": self.namespace,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict) -> AgentConfig:
-        """Create from dictionary."""
-        return cls(
-            domain=data["domain"],
-            agent_name=data["agent_name"],
-            system_prompt=data["system_prompt"],
-            voice_id=data.get("voice_id"),
-            personality=data.get("personality", "professional"),
-            industry=data.get("industry", "general"),
-            tone_keywords=data.get("tone_keywords", []),
-            conversation_style=data.get("conversation_style", "helpful"),
-            namespace=data.get("namespace", f"kb:{data['domain']}"),
-        )
+    def to_request_body(self) -> Dict[str, Any]:
+        """Return the JSON payload ready for the ElevenLabs create API."""
+        return self.request_payload
 
 
 class VoiceAgentGenerator:
-    """Generates personalized voice agents for businesses."""
+    """Generate and optionally register ElevenLabs voice agents."""
 
     def __init__(
         self,
         agents_dir: str = "pipeline/agents",
-        config_path: str = "pipeline/config/agent_templates.json",
         use_llm: bool = True,
-        openrouter_config: Optional[str] = None
-    ):
-        """Initialize voice agent generator.
-
-        Args:
-            agents_dir: Directory to store agent configurations
-            config_path: Path to agent template configurations
-            use_llm: Whether to use LLM for system prompt generation
-            openrouter_config: Path to OpenRouter configuration file
-        """
+        openrouter_config: Optional[str] = None,
+    ) -> None:
+        """Initialize the generator."""
         self.agents_dir = Path(agents_dir)
         self.agents_dir.mkdir(parents=True, exist_ok=True)
-        self.config_path = Path(config_path)
-        self.templates = self._load_templates()
         self.use_llm = use_llm
+        self.voice_id = DEFAULT_VOICE_ID
 
-        # Initialize OpenRouter client for LLM system prompt generation
+        self.llm_client: Optional[OpenRouterClient] = None
         if use_llm:
             try:
                 self.llm_client = OpenRouterClient(openrouter_config)
-                logger.info("🤖 Initialized OpenRouter client for system prompt generation")
-            except Exception as e:
-                logger.warning(f"Failed to initialize OpenRouter client: {e}. Using template-based prompts.")
+                logger.info("🤖 Initialized OpenRouter client for agent config generation")
+            except Exception as exc:
+                logger.warning("Failed to initialize OpenRouter client (%s). Falling back to templates.", exc)
                 self.use_llm = False
-                self.llm_client = None
-
-    def _load_templates(self) -> Dict[str, Dict]:
-        """Load agent templates for different industries."""
-        if self.config_path.exists():
-            try:
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load templates: {e}")
-
-        # Default templates
-        return {
-            "default": {
-                "base_prompt": "You are a helpful AI assistant for {business_name}. You have access to the company's knowledge base and can provide information about their services, answer questions, and help potential customers.",
-                "personalities": {
-                    "professional": "Maintain a professional, courteous tone. Be informative and helpful.",
-                    "friendly": "Be warm, approachable, and conversational. Show genuine interest in helping.",
-                    "expert": "Position yourself as a knowledgeable expert. Provide detailed, technical information when appropriate."
-                },
-                "industry_defaults": {
-                    "dentists": {
-                        "personality": "professional",
-                        "tone_keywords": ["caring", "experienced", "gentle", "professional"],
-                        "conversation_style": "reassuring"
-                    },
-                    "law_firms": {
-                        "personality": "professional",
-                        "tone_keywords": ["experienced", "confidential", "reliable", "expert"],
-                        "conversation_style": "authoritative"
-                    },
-                    "hvac": {
-                        "personality": "friendly",
-                        "tone_keywords": ["reliable", "efficient", "experienced", "responsive"],
-                        "conversation_style": "practical"
-                    },
-                    "general": {
-                        "personality": "professional",
-                        "tone_keywords": ["helpful", "knowledgeable", "responsive"],
-                        "conversation_style": "helpful"
-                    }
-                }
-            }
-        }
-
-    def generate_agent_config(
-        self,
-        domain: str,
-        business_name: str,
-        industry: str,
-        content_summary: Dict[str, str]
-    ) -> AgentConfig:
-        """Generate agent configuration for a business.
-
-        Args:
-            domain: Business domain
-            business_name: Business name
-            industry: Business industry
-            content_summary: Summary of scraped content by type
-
-        Returns:
-            AgentConfig for the business
-        """
-        logger.info(f"🤖 Generating voice agent config for {business_name} ({domain})")
-
-        # Get industry-specific settings
-        industry_config = self.templates["default"]["industry_defaults"].get(
-            industry.lower().replace(" ", "_"),
-            self.templates["default"]["industry_defaults"]["general"]
-        )
-
-        # Analyze content to extract tone and personality
-        personality, tone_keywords, conversation_style = self._analyze_business_content(
-            content_summary, industry_config
-        )
-
-        # Generate system prompt
-        system_prompt = self._generate_system_prompt_with_llm(
-            business_name, domain, industry, content_summary, personality, tone_keywords
-        ) if self.use_llm and self.llm_client else self._generate_system_prompt(
-            business_name, industry, content_summary, personality, tone_keywords
-        )
-
-        # Create agent config
-        config = AgentConfig(
-            domain=domain,
-            agent_name=f"{business_name} Assistant",
-            system_prompt=system_prompt,
-            personality=personality,
-            industry=industry,
-            tone_keywords=tone_keywords,
-            conversation_style=conversation_style,
-        )
-
-        logger.info(f"✅ Generated agent config: {config.agent_name}")
-        return config
-
-    def _analyze_business_content(
-        self,
-        content_summary: Dict[str, str],
-        industry_config: Dict
-    ) -> tuple[str, List[str], str]:
-        """Analyze business content to determine personality and tone.
-
-        Args:
-            content_summary: Summary of content by type
-            industry_config: Industry-specific defaults
-
-        Returns:
-            Tuple of (personality, tone_keywords, conversation_style)
-        """
-        personality = industry_config["personality"]
-        tone_keywords = industry_config["tone_keywords"].copy()
-        conversation_style = industry_config["conversation_style"]
-
-        # Analyze content for additional tone indicators
-        all_content = " ".join(content_summary.values()).lower()
-
-        # Check for friendly language patterns
-        friendly_indicators = ["welcome", "happy to help", "please", "thank you", "excited"]
-        friendly_count = sum(1 for word in friendly_indicators if word in all_content)
-
-        # Check for professional language patterns
-        professional_indicators = ["expertise", "experience", "professional", "qualified", "certified"]
-        professional_count = sum(1 for word in professional_indicators if word in all_content)
-
-        # Adjust personality based on content analysis
-        if friendly_count > professional_count and friendly_count > 2:
-            personality = "friendly"
-            if "approachable" not in tone_keywords:
-                tone_keywords.append("approachable")
-            conversation_style = "conversational"
-        elif professional_count > friendly_count and professional_count > 2:
-            personality = "expert"
-            if "authoritative" not in tone_keywords:
-                tone_keywords.append("authoritative")
-            conversation_style = "informative"
-
-        return personality, tone_keywords, conversation_style
-
-    def _generate_system_prompt(
-        self,
-        business_name: str,
-        industry: str,
-        content_summary: Dict[str, str],
-        personality: str,
-        tone_keywords: List[str]
-    ) -> str:
-        """Generate personalized system prompt for the agent following ElevenLabs best practices.
-
-        Based on official ElevenLabs documentation for Conversational AI agents.
-
-        Args:
-            business_name: Name of the business
-            industry: Business industry
-            content_summary: Summary of scraped content
-            personality: Agent personality type
-            tone_keywords: Tone keywords for the agent
-
-        Returns:
-            Complete system prompt optimized for ElevenLabs agents
-        """
-        # Extract key information from content
-        services = content_summary.get("services", "")
-        about = content_summary.get("about", "")
-        team = content_summary.get("team", "")
-
-        # ElevenLabs System Prompt Structure (based on their documentation)
-        # 1. Role Definition - Clear, specific role
-        # 2. Context - Business background and expertise
-        # 3. Communication Guidelines - How to interact
-        # 4. Boundaries - What not to do and escalation paths
-        # 5. Response Format - How to structure responses
-
-        system_prompt = f"""# {business_name} AI Assistant
-
-## Role
-You are {business_name}'s official AI assistant, a knowledgeable representative specializing in {industry}. You provide accurate, helpful information about {business_name}'s services and expertise.
-
-## Business Context
-{f"About {business_name}: {about[:400]}" if about else f"{business_name} is a trusted {industry} business."}
-{f"Services: {services[:500]}" if services else ""}
-{f"Team: {team[:300]}" if team else ""}
-
-## Communication Style
-- **Personality**: {personality.title()}
-- **Tone**: {', '.join(tone_keywords)}
-- **Approach**: {'Conversational and approachable' if personality == 'friendly' else 'Professional and informative' if personality == 'expert' else 'Professional and reassuring'}
-
-## Guidelines for Interaction
-1. **Be Helpful & Accurate**: Provide clear, factual information based on {business_name}'s actual services and capabilities
-2. **Stay In Character**: Always represent {business_name} positively and professionally
-3. **Use Natural Language**: Respond conversationally, as if speaking to a customer
-4. **Be Concise but Complete**: Give comprehensive answers without being verbose
-5. **Show Empathy**: Acknowledge customer needs and concerns appropriately
-
-## Response Best Practices
-- Start with acknowledgment of the customer's question or need
-- Provide direct, actionable information
-- Use the customer's name if provided
-- End with an offer to help further or provide next steps
-- For complex inquiries, suggest speaking with a human representative
-
-## Boundaries & Escalation
-- Only provide information that {business_name} can actually deliver
-- If unsure about details, acknowledge limitations and offer to connect with a team member
-- Never make promises about pricing, availability, or services without verification
-- For urgent or complex matters, always recommend human contact
-
-## Response Format
-- Keep responses under 2 minutes when spoken
-- Use simple, clear language
-- Structure responses with clear beginning, middle, and end
-- Include specific next steps when appropriate
-
-Remember: You are the voice of {business_name}. Every interaction should reinforce trust, expertise, and customer care."""
-
-        return system_prompt
-
-    def _generate_system_prompt_with_llm(
-        self,
-        business_name: str,
-        domain: str,
-        industry: str,
-        content_summary: Dict[str, str],
-        personality: str,
-        tone_keywords: List[str]
-    ) -> str:
-        """Generate system prompt using LLM with ElevenLabs documentation guidance.
-
-        Args:
-            business_name: Name of the business
-            domain: Business domain
-            industry: Business industry
-            content_summary: Summary of scraped content
-            personality: Agent personality type
-            tone_keywords: Tone keywords for the agent
-
-        Returns:
-            LLM-generated system prompt following ElevenLabs best practices
-        """
-        logger.info(f"🤖 Generating LLM system prompt for {business_name} with ElevenLabs guidance")
-
-        try:
-            # Create business context
-            business_context = BusinessContext(
-                name=business_name,
-                domain=domain,
-                industry=industry,
-                services_content=content_summary.get("services"),
-                about_content=content_summary.get("about"),
-                team_content=content_summary.get("team"),
-                blog_content=content_summary.get("blog")
-            )
-
-            # Create agent context (placeholder values since we're generating the prompt)
-            agent_context = AgentContext(
-                agent_name=f"{business_name} Assistant",
-                personality=personality,
-                tone_keywords=tone_keywords,
-                conversation_style="helpful",
-                industry=industry,
-                system_prompt="",  # Will be generated
-                namespace=f"kb:{domain}"
-            )
-
-            # Generate system prompt using LLM with ElevenLabs documentation
-            system_prompt = self.llm_client.generate_agent_system_prompt(
-                business_context, agent_context
-            )
-
-            logger.info(f"✅ Generated LLM system prompt for {business_name}")
-            return system_prompt
-
-        except Exception as e:
-            logger.warning(f"LLM system prompt generation failed: {e}. Falling back to template.")
-            # Fall back to template-based generation
-            return self._generate_system_prompt(
-                business_name, industry, content_summary, personality, tone_keywords
-            )
-
-    def create_elevenlabs_agent(self, config: AgentConfig) -> Optional[str]:
-        """Create ElevenLabs agent from configuration.
-
-        Args:
-            config: Agent configuration
-
-        Returns:
-            Agent ID if successful, None otherwise
-        """
-        try:
-            from elevenlabs.client import ElevenLabs
-
-            elevenlabs_config = get_config()
-
-            if not elevenlabs_config.elevenlabs_api_key:
-                logger.error("❌ ElevenLabs API key not configured")
-                return None
-
-            client = ElevenLabs(api_key=elevenlabs_config.elevenlabs_api_key)
-
-            # Create agent
-            agent_data = {
-                "name": config.agent_name,
-                "system_prompt": config.system_prompt,
-                "personality": config.personality,
-                "conversation_config": {
-                    "turn_detection": {
-                        "type": "server_vad"
-                    }
-                }
-            }
-
-            # Set voice if specified
-            if config.voice_id:
-                agent_data["voice_id"] = config.voice_id
-
-            agent = client.agents.create(**agent_data)
-            agent_id = getattr(agent, "id", None) or getattr(agent, "agent_id", None)
-
-            if agent_id:
-                config.voice_id = getattr(agent, "voice_id", None)
-                logger.info(f"🎤 Created ElevenLabs agent: {agent_id}")
-                return agent_id
-            else:
-                logger.error("❌ Failed to get agent ID from ElevenLabs response")
-                return None
-
-        except Exception as e:
-            logger.error(f"❌ Failed to create ElevenLabs agent: {e}")
-            return None
-
-    def save_agent_config(self, config: AgentConfig) -> None:
-        """Save agent configuration to file.
-
-        Args:
-            config: Agent configuration to save
-        """
-        domain_dir = self.agents_dir / config.domain.replace(".", "_")
-        domain_dir.mkdir(parents=True, exist_ok=True)
-
-        config_file = domain_dir / "agent.json"
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(config.to_dict(), f, indent=2, ensure_ascii=False)
-
-        logger.info(f"💾 Saved agent config to {config_file}")
 
     def generate_agent_for_business(
         self,
-        domain: str,
+        domain: Optional[str],
         business_name: str,
         industry: str,
-        content_summary: Optional[Dict[str, str]] = None,
-        create_elevenlabs: bool = True
+        lead: Optional[Lead] = None,
+        business_intelligence: Optional[Dict[str, Any]] = None,
+        create_elevenlabs: bool = True,
     ) -> Optional[AgentConfig]:
-        """Complete pipeline: generate and optionally create ElevenLabs agent.
+        """Create an agent payload and optionally register it with ElevenLabs."""
+        lead = lead or self._build_placeholder_lead(domain, business_name, industry)
+        intelligence = business_intelligence or {"lead_profile": self._lead_to_profile(lead, domain, industry)}
+        if "lead_profile" not in intelligence:
+            intelligence["lead_profile"] = self._lead_to_profile(lead, domain, industry)
 
-        Args:
-            domain: Business domain
-            business_name: Business name
-            industry: Business industry
-            content_summary: Summary of scraped content (will be generated if None)
-            create_elevenlabs: Whether to create actual ElevenLabs agent
+        lead_profile = intelligence["lead_profile"]
+        blueprint = self._generate_blueprint(lead_profile, intelligence, industry)
+        payload = self._build_request_payload(blueprint)
 
-        Returns:
-            AgentConfig if successful, None otherwise
-        """
-        try:
-            # Load content summary if not provided
-            if content_summary is None:
-                content_summary = self._extract_content_summary(domain)
+        resolved_domain = lead_profile.get("domain") or domain or "unknown"
+        config = AgentConfig(domain=resolved_domain.replace(" ", "_"), request_payload=payload)
 
-            if not content_summary:
-                logger.warning(f"⚠️ No content summary available for {domain}")
-                content_summary = {"general": f"Information about {business_name}, a {industry} business."}
+        if create_elevenlabs:
+            agent_id = self.create_elevenlabs_agent(config)
+            if agent_id:
+                config.agent_id = agent_id
 
-            # Generate configuration
-            config = self.generate_agent_config(domain, business_name, industry, content_summary)
+        self.save_agent_config(config)
+        logger.info("🎉 Generated agent payload for %s", business_name)
+        return config
 
-            # Create ElevenLabs agent if requested
-            if create_elevenlabs:
-                agent_id = self.create_elevenlabs_agent(config)
-                if agent_id:
-                    # Update config with agent ID
-                    config.voice_id = agent_id
+    def create_elevenlabs_agent(self, config: AgentConfig) -> Optional[str]:
+        """Call ElevenLabs create API with the generated payload."""
+        eleven_config = get_config()
+        api_key = getattr(eleven_config, "elevenlabs_api_key", None)
 
-            # Save configuration
-            self.save_agent_config(config)
-
-            logger.info(f"🎉 Successfully generated agent for {business_name}")
-            return config
-
-        except Exception as e:
-            logger.error(f"❌ Failed to generate agent for {domain}: {e}")
+        if not api_key:
+            logger.warning("ElevenLabs API key not configured; skipping agent creation")
             return None
 
-    def _extract_content_summary(self, domain: str) -> Dict[str, str]:
-        """Extract content summary from scraped business data.
-
-        Args:
-            domain: Business domain
-
-        Returns:
-            Dictionary of content type to summary text
-        """
-        data_dir = Path("pipeline/business_data") / domain.replace(".", "_")
-        content_file = data_dir / "content.json"
-
-        if not content_file.exists():
-            return {}
-
         try:
-            with open(content_file, 'r', encoding='utf-8') as f:
-                content_data = json.load(f)
+            response = requests.post(
+                ELEVENLABS_CREATE_AGENT_URL,
+                headers={
+                    "xi-api-key": api_key,
+                    "Content-Type": "application/json",
+                },
+                json=config.to_request_body(),
+                timeout=30,
+            )
+            if response.status_code >= 400:
+                logger.error("❌ ElevenLabs create agent failed: %s - %s", response.status_code, response.text[:200])
+                return None
 
-            summaries = {}
-            for content_type, items in content_data.items():
-                if items:
-                    # Combine content from same type, limit to prevent prompt overflow
-                    combined_content = " ".join([item["content"] for item in items[:3]])  # First 3 pages
-                    summaries[content_type] = combined_content[:1000]  # Limit length
+            data = response.json()
+            agent_id = data.get("agent_id")
+            if not agent_id:
+                logger.warning("Create agent response missing agent_id: %s", data)
+                return None
 
-            return summaries
+            logger.info("🎤 Registered ElevenLabs agent: %s", agent_id)
+            return agent_id
+        except requests.RequestException as exc:
+            logger.error("❌ ElevenLabs agent creation request failed: %s", exc)
+            return None
 
-        except Exception as e:
-            logger.error(f"Failed to extract content summary for {domain}: {e}")
-            return {}
+    def save_agent_config(self, config: AgentConfig) -> None:
+        """Persist the agent request payload to disk."""
+        directory = self.agents_dir / config.domain.replace(".", "_")
+        directory.mkdir(parents=True, exist_ok=True)
+
+        config_file = directory / "agent_request.json"
+        with open(config_file, "w", encoding="utf-8") as handle:
+            json.dump(config.to_request_body(), handle, indent=2, ensure_ascii=False)
+
+        logger.info("💾 Saved agent request payload to %s", config_file)
+
+    # ------------------------------------------------------------------ #
+    # Internal helpers                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _build_placeholder_lead(self, domain: Optional[str], business_name: str, industry: str) -> Lead:
+        """Create a minimal lead object when one is not supplied."""
+        return Lead(
+            name=business_name,
+            domain=domain or "",
+            industry=industry,
+            source="manual_placeholder",
+        )
+
+    def _lead_to_profile(self, lead: Lead, domain: Optional[str], industry: str) -> Dict[str, Any]:
+        """Convert a Lead into a blueprint-friendly profile."""
+        domain = domain or lead.domain or (lead.email.split("@")[-1] if lead.email else None)
+        profile = {
+            "name": lead.name,
+            "company": lead.metadata.get("apollo_contact_data", {}).get("organization_name") if lead.metadata else None,
+            "industry": lead.industry or industry,
+            "location": lead.location,
+            "description": lead.description,
+            "domain": domain,
+            "primary_email": lead.email,
+            "phone": lead.phone,
+        }
+        if not profile.get("company"):
+            profile["company"] = lead.name
+        return {k: v for k, v in profile.items() if v}
+
+    def _generate_blueprint(
+        self,
+        lead_profile: Dict[str, Any],
+        intelligence: Dict[str, Any],
+        industry: str,
+    ) -> Dict[str, Any]:
+        """Generate blueprint fields via LLM with fallback."""
+        if self.use_llm and self.llm_client:
+            try:
+                return self.llm_client.generate_agent_blueprint(lead_profile, intelligence, industry)
+            except Exception as exc:
+                logger.warning("LLM blueprint generation failed: %s", exc)
+
+        return self._fallback_blueprint(lead_profile, industry)
+
+    def _fallback_blueprint(self, lead_profile: Dict[str, Any], industry: str) -> Dict[str, Any]:
+        """Fallback blueprint ensuring we can continue without the LLM."""
+        business_name = lead_profile.get("company") or lead_profile.get("name", "Business")
+        return {
+            "name": f"{business_name} AI Assistant",
+            "first_message": (
+                f"Hi there! You're speaking with the AI assistant for {business_name}. "
+                "I can help with services, availability, and next steps. How may I support you today?"
+            ),
+            "language": "en-US",
+            "system_prompt": self._build_fallback_system_prompt(lead_profile, industry),
+            "tags": [f"industry:{industry}", "source:voice_agent_pipeline"],
+        }
+
+    def _build_fallback_system_prompt(self, lead_profile: Dict[str, Any], industry: str) -> str:
+        """Produce a deterministic system prompt when the LLM is unavailable."""
+        company = lead_profile.get("company") or lead_profile.get("name", "the business")
+        description = lead_profile.get("description") or f"{company} is a trusted {industry} provider."
+        return f"""# {company} AI Assistant
+
+## Role
+You are {company}'s official AI assistant. Welcome callers, understand their needs, answer questions about services, and guide them to the best next step.
+
+## Business Context
+{description}
+
+## Communication Style
+- **Personality**: Professional and reassuring
+- **Tone**: Warm, knowledgeable, and patient
+- **Approach**: Conversational, concise, and action-oriented
+
+## Guidelines for Interaction
+1. Acknowledge the caller's request and use their name if provided.
+2. Provide clear answers grounded in {company}'s services.
+3. Offer to schedule appointments or escalate to a human when appropriate.
+4. Ask clarifying questions if information is missing.
+5. Summarize next steps before ending the conversation.
+
+## Response Best Practices
+- Use natural spoken language and short sentences.
+- Keep answers focused on the caller's goal.
+- Share relevant service highlights or differentiators.
+- End with a helpful follow-up question or offer to assist further.
+
+## Boundaries & Escalation
+- Avoid pricing or guarantees unless explicitly provided by {company}.
+- Escalate urgent, complex, or highly specialized requests to a human team member.
+- Do not answer questions that fall outside of {company}'s services.
+
+## Response Format
+- Keep spoken responses between 30–90 seconds.
+- Use a clear beginning, middle, and end.
+- Offer one or two concrete next steps when helpful.
+
+Remember: Every interaction should reinforce {company}'s expertise, reliability, and care."""
+
+    def _build_request_payload(self, blueprint: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge blueprint fields with standard conversation configuration."""
+        conversation_config = {
+            "agent": {
+                "first_message": blueprint["first_message"].strip(),
+                "language": blueprint.get("language", "en-US"),
+                "prompt": {
+                    "prompt": blueprint["system_prompt"],
+                    "llm": "gpt-4o-mini",
+                    "reasoning_effort": "low",
+                },
+            },
+            "tts": {
+                "model_id": DEFAULT_TTS_MODEL_ID,
+                "voice_id": DEFAULT_VOICE_ID,
+                "agent_output_audio_format": DEFAULT_AUDIO_FORMAT,
+                "optimize_streaming_latency": "3",
+                "stability": 0.45,
+                "similarity_boost": 0.3,
+            },
+            "asr": {
+                "provider": "elevenlabs",
+                "quality": "high",
+                "user_input_audio_format": DEFAULT_AUDIO_FORMAT,
+            },
+            "turn": {
+                "turn_timeout": 30,
+                "initial_wait_time": 0.4,
+                "silence_end_call_timeout": 60,
+                "soft_timeout_config": {
+                    "timeout_seconds": 25,
+                    "message": "I'm still here if you need anything else.",
+                },
+                "turn_eagerness": "normal",
+            },
+            "conversation": {
+                "text_only": False,
+                "max_duration_seconds": 900,
+            },
+        }
+
+        payload: Dict[str, Any] = {
+            "name": blueprint["name"],
+            "conversation_config": conversation_config,
+        }
+
+        tags = blueprint.get("tags")
+        if tags:
+            payload["tags"] = tags
+
+        return payload
 
 
-def main():
-    """CLI interface for voice agent generation."""
+def main() -> None:
+    """CLI for ad-hoc agent payload generation."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate voice agents for businesses")
-    parser.add_argument("--domain", required=True, help="Business domain")
+    parser = argparse.ArgumentParser(description="Generate ElevenLabs agent payloads")
+    parser.add_argument("--domain", help="Business domain (optional)")
     parser.add_argument("--business-name", required=True, help="Business name")
     parser.add_argument("--industry", required=True, help="Business industry")
-    parser.add_argument("--create-elevenlabs", action="store_true", help="Create actual ElevenLabs agent")
-    parser.add_argument("--agents-dir", default="pipeline/agents", help="Agents storage directory")
+    parser.add_argument("--create-elevenlabs", action="store_true", help="Create agent on ElevenLabs")
+    parser.add_argument("--agents-dir", default="pipeline/agents", help="Directory to store payloads")
 
     args = parser.parse_args()
 
-    generator = VoiceAgentGenerator(args.agents_dir)
+    generator = VoiceAgentGenerator(agents_dir=args.agents_dir, use_llm=True)
+    placeholder_lead = Lead(
+        name=args.business_name,
+        domain=args.domain or "",
+        industry=args.industry,
+        source="cli",
+    )
+    intelligence = {"lead_profile": generator._lead_to_profile(placeholder_lead, args.domain, args.industry)}
+
     config = generator.generate_agent_for_business(
         domain=args.domain,
         business_name=args.business_name,
         industry=args.industry,
-        create_elevenlabs=args.create_elevenlabs
+        lead=placeholder_lead,
+        business_intelligence=intelligence,
+        create_elevenlabs=args.create_elevenlabs,
     )
 
     if config:
-        print(f"Successfully generated agent for {args.business_name}")
-        print(f"Agent name: {config.agent_name}")
-        if config.voice_id:
-            print(f"ElevenLabs Agent ID: {config.voice_id}")
+        print(f"Successfully generated payload for {args.business_name}")
+        if config.agent_id:
+            print(f"Registered ElevenLabs agent ID: {config.agent_id}")
     else:
-        print("Failed to generate agent")
-        exit(1)
+        print("Failed to generate agent payload")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

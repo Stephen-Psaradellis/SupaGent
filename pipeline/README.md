@@ -152,7 +152,7 @@ Searches multiple sources:
 - Voice response length optimization
 - Brand voice consistency enforcement
 
-**Output:** `pipeline/agents/{domain}/agent.json` with LLM-generated system prompts
+**Output:** `pipeline/agents/{domain}/agent_request.json` containing the ElevenLabs create-agent payload
 
 ### 4. Email Composition (LLM-Powered)
 - **AI-Generated Content**: Uses Mistral Medium via OpenRouter for intelligent email composition

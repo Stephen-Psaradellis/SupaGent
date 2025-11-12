@@ -1,0 +1,36 @@
+{
+  "default": {
+    "industry_defaults": {
+      "general": {
+        "personality": "professional",
+        "tone_keywords": ["helpful", "knowledgeable", "responsive"],
+        "conversation_style": "helpful"
+      },
+      "dentistry": {
+        "personality": "professional",
+        "tone_keywords": ["caring", "reassuring", "knowledgeable"],
+        "conversation_style": "empathetic"
+      },
+      "legal": {
+        "personality": "expert",
+        "tone_keywords": ["authoritative", "trustworthy", "detail-oriented"],
+        "conversation_style": "informative"
+      },
+      "hvac": {
+        "personality": "reliable",
+        "tone_keywords": ["responsive", "practical", "experienced"],
+        "conversation_style": "helpful"
+      },
+      "plumbing": {
+        "personality": "reliable",
+        "tone_keywords": ["responsive", "practical", "experienced"],
+        "conversation_style": "helpful"
+      },
+      "restaurant": {
+        "personality": "friendly",
+        "tone_keywords": ["welcoming", "attentive", "accommodating"],
+        "conversation_style": "conversational"
+      }
+    }
+  }
+}

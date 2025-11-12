@@ -884,18 +884,19 @@ async def get_business_profile(
             content_data = json.load(f)
 
         # Load agent configuration if available
-        agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent.json"
+        agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent_request.json"
         agent_info = ""
         if agent_file.exists():
             with open(agent_file, 'r', encoding='utf-8') as f:
                 agent_data = json.load(f)
+                agent_section = agent_data.get("conversation_config", {}).get("agent", {})
+                prompt_section = agent_section.get("prompt", {})
                 agent_info = f"""
-Voice Agent Configuration:
-- Name: {agent_data.get('agent_name', 'Not configured')}
-- Personality: {agent_data.get('personality', 'Not configured')}
-- Industry: {agent_data.get('industry', 'Not configured')}
-- Conversation Style: {agent_data.get('conversation_style', 'Not configured')}
-- Tone Keywords: {', '.join(agent_data.get('tone_keywords', []))}
+Voice Agent Payload:
+- Name: {agent_data.get('name', 'Not configured')}
+- First Message: {agent_section.get('first_message', 'Not configured')}
+- Language: {agent_section.get('language', 'en-US')}
+- Prompt Preview: {prompt_section.get('prompt', '')[:240]}...
 """
 
         # Summarize content by type

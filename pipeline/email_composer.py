@@ -11,6 +11,7 @@ Features:
 - Dynamic subject line generation
 - Value proposition highlighting based on scraped content
 - Professional formatting and compliance
+- HTML template personalization using LLM intelligence
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from pipeline.openrouter_client import OpenRouterClient, BusinessContext, AgentContext
+from .openrouter_client import OpenRouterClient, BusinessContext, AgentContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +66,279 @@ class EmailTemplate:
         }
 
 
+@dataclass
+class PersonalizedHTMLTemplate:
+    """Personalized HTML email template with dynamic content."""
+
+    hero_title: str
+    hero_subtitle: str
+    company_name: str
+    demo_conversation: List[Dict[str, str]]
+    features: List[Dict[str, str]]
+    pricing_title: str
+    pricing_subtitle: str
+    urgency_title: str
+    urgency_text: str
+    voice_agent_id: Optional[str] = None
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "hero_title": self.hero_title,
+            "hero_subtitle": self.hero_subtitle,
+            "company_name": self.company_name,
+            "demo_conversation": self.demo_conversation,
+            "features": self.features,
+            "pricing_title": self.pricing_title,
+            "pricing_subtitle": self.pricing_subtitle,
+            "urgency_title": self.urgency_title,
+            "urgency_text": self.urgency_text,
+            "voice_agent_id": self.voice_agent_id,
+        }
+
+
+class HTMLTemplateGenerator:
+    """Generates personalized HTML email templates using LLM intelligence."""
+
+    def __init__(
+        self,
+        html_template_path: str = "pipeline/emails/templates/shortforge_email_cta.html",
+        openrouter_config: Optional[str] = None
+    ):
+        """Initialize HTML template generator.
+
+        Args:
+            html_template_path: Path to base HTML template
+            openrouter_config: Path to OpenRouter configuration file
+        """
+        self.html_template_path = Path(html_template_path)
+        self.llm_client = None
+
+        # Initialize OpenRouter client
+        try:
+            self.llm_client = OpenRouterClient(openrouter_config)
+            logger.info("🤖 Initialized OpenRouter client for HTML template personalization")
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenRouter client: {e}")
+
+        # Load base template
+        self.base_template = self._load_base_template()
+
+    def _load_base_template(self) -> str:
+        """Load the base HTML template."""
+        if not self.html_template_path.exists():
+            raise FileNotFoundError(f"HTML template not found: {self.html_template_path}")
+
+        with open(self.html_template_path, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def generate_personalized_content(
+        self,
+        business_name: str,
+        domain: str,
+        industry: str,
+        lead_data: Dict,
+        business_content: Optional[Dict[str, str]] = None
+    ) -> PersonalizedHTMLTemplate:
+        """Generate personalized content for HTML template using LLM.
+
+        Args:
+            business_name: Name of the business
+            domain: Business domain
+            industry: Business industry
+            lead_data: Lead data dictionary
+            business_content: Business content summary
+
+        Returns:
+            Personalized HTML template data
+        """
+        if not self.llm_client:
+            logger.warning("No LLM client available, using default content")
+            return self._get_default_content(business_name, domain, industry)
+
+        # Create business context
+        business_context = BusinessContext(
+            name=business_name,
+            domain=domain,
+            industry=industry,
+            location=lead_data.get("location"),
+            email=lead_data.get("email"),
+            services_content=business_content.get("services") if business_content else None,
+            about_content=business_content.get("about") if business_content else None,
+            team_content=business_content.get("team") if business_content else None,
+            blog_content=business_content.get("blog") if business_content else None,
+        )
+
+        # Generate personalized content using LLM
+        prompt = self._build_personalization_prompt(business_context, lead_data)
+
+        try:
+            response = self.llm_client._call_openrouter(prompt)
+            content = self._parse_llm_response(response)
+            return PersonalizedHTMLTemplate(**content)
+
+        except Exception as e:
+            logger.error(f"Failed to generate personalized content: {e}")
+            return self._get_default_content(business_name, domain, industry)
+
+    def _build_personalization_prompt(self, business_context: BusinessContext, lead_data: Dict) -> str:
+        """Build the LLM prompt for content personalization."""
+        return f"""You are creating personalized marketing content for ShortForge Consultancy's AI Voice Agent demo email.
+
+Target Business Details:
+- Business Name: {business_context.name}
+- Industry: {business_context.industry}
+- Domain: {business_context.domain}
+- Location: {business_context.location or 'Unknown'}
+- Email: {business_context.email or 'Unknown'}
+
+Business Intelligence Available:
+- Services: {business_context.services_content[:500] if business_context.services_content else 'Not available'}
+- About: {business_context.about_content[:500] if business_context.about_content else 'Not available'}
+- Team: {business_context.team_content[:500] if business_context.team_content else 'Not available'}
+
+Your task is to create personalized, compelling content that:
+1. Shows deep understanding of their business and pain points
+2. Demonstrates how AI voice agents solve their specific challenges
+3. Maintains the same structure and tone as the original content
+4. Makes the content feel custom-built for their business
+
+Generate content for these sections:
+
+1. HERO_TITLE: A compelling headline (keep format similar to "See How AI Can Run Your Business")
+
+2. HERO_SUBTITLE: A personalized subtitle explaining how AI agents help their specific business (2-3 sentences)
+
+3. DEMO_CONVERSATION: A realistic conversation between "Forge" and a potential customer, showing how the AI understands their business. Include:
+   - Forge greeting and introduction
+   - Customer question about their specific industry/service
+   - Forge's knowledgeable response showing business understanding
+   - Forge offering more help
+
+4. FEATURES: 3 key features personalized for their industry, each with title and description
+
+5. PRICING_TITLE: Pricing headline (keep similar format)
+
+6. PRICING_SUBTITLE: Personalized subtitle about their specific business needs
+
+7. URGENCY_TEXT: Urgency message personalized for their industry
+
+Return the content as a JSON object with these exact keys:
+{{
+    "hero_title": "string",
+    "hero_subtitle": "string",
+    "company_name": "{business_context.name}",
+    "demo_conversation": [
+        {{"speaker": "Forge", "message": "string"}},
+        {{"speaker": "User", "message": "string"}},
+        {{"speaker": "Forge", "message": "string"}},
+        {{"speaker": "Forge", "message": "string"}}
+    ],
+    "features": [
+        {{"title": "string", "description": "string"}},
+        {{"title": "string", "description": "string"}},
+        {{"title": "string", "description": "string"}}
+    ],
+    "pricing_title": "string",
+    "pricing_subtitle": "string",
+    "urgency_title": "string",
+    "urgency_text": "string"
+}}
+
+Make it sound professional, show industry expertise, and create urgency to try the demo."""
+
+    def _parse_llm_response(self, response: str) -> Dict:
+        """Parse the LLM response into structured data."""
+        try:
+            # Try to extract JSON from the response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = response[json_start:json_end]
+                return json.loads(json_str)
+            else:
+                logger.warning("No JSON found in LLM response, using default content")
+                return self._get_default_content("", "", "")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            return self._get_default_content("", "", "")
+
+    def _get_default_content(self, business_name: str, domain: str, industry: str) -> PersonalizedHTMLTemplate:
+        """Get default content when LLM generation fails."""
+        agent_id = os.getenv("ELEVENLABS_AGENT_ID", "")
+        return PersonalizedHTMLTemplate(
+            hero_title="See How AI Can Run Your Business",
+            hero_subtitle="Your clients, leads, and internal ops don't need to wait for a human anymore. Our AI Voice Agents can qualify leads, schedule meetings, handle customer support, and trigger backend workflows — automatically.",
+            company_name=business_name or "Your Company",
+            demo_conversation=[
+                {"speaker": "Forge", "message": "Hey there, I'm Forge — your AI automation specialist."},
+                {"speaker": "User", "message": "Can you show me how you automate lead follow-ups?"},
+                {"speaker": "Forge", "message": "Absolutely. We can integrate with your CRM and send follow-ups instantly after a new inquiry."},
+                {"speaker": "Forge", "message": "Ask me anything about automating your business."}
+            ],
+            features=[
+                {"title": "AI Agents That Work Like Staff", "description": "Deploy autonomous voice and workflow agents that can talk, schedule, and execute your processes."},
+                {"title": "Integrates With Your Stack", "description": "Connect to tools like Notion, Slack, Google Workspace, HubSpot, or custom APIs seamlessly."},
+                {"title": "Custom-Built For You", "description": "Each system is tuned to your internal processes — not a generic chatbot."}
+            ],
+            pricing_title="Start Automating Without the Overhead",
+            pricing_subtitle="We design and deploy your first production-ready AI agent within two weeks.",
+            urgency_title="Early Access Offer — Limited Seats",
+            urgency_text="We're onboarding only 10 new clients this quarter to ensure quality. Get started now and your first AI agent setup is included free.",
+            voice_agent_id=agent_id
+        )
+
+    def generate_html_email(
+        self,
+        personalized_content: PersonalizedHTMLTemplate
+    ) -> str:
+        """Generate the final HTML email with personalized content.
+
+        Args:
+            personalized_content: The personalized content to insert
+
+        Returns:
+            Complete HTML email string
+        """
+        html = self.base_template
+
+        # Replace placeholders with personalized content
+        replacements = {
+            "{{hero_title}}": personalized_content.hero_title,
+            "{{hero_subtitle}}": personalized_content.hero_subtitle,
+            "{{company_name}}": personalized_content.company_name,
+            "{{pricing_title}}": personalized_content.pricing_title,
+            "{{pricing_subtitle}}": personalized_content.pricing_subtitle,
+            "{{urgency_title}}": personalized_content.urgency_title,
+            "{{urgency_text}}": personalized_content.urgency_text,
+            "{{voice_agent_id}}": personalized_content.voice_agent_id or "",
+        }
+
+        # Apply basic replacements
+        for placeholder, content in replacements.items():
+            html = html.replace(placeholder, content)
+
+        # Handle dynamic conversation
+        conversation_html = ""
+        for msg in personalized_content.demo_conversation:
+            conversation_html += f'        <div>&gt; {msg["speaker"]}: "{msg["message"]}"</div>\n'
+
+        html = html.replace("        <!-- DYNAMIC_CONVERSATION_PLACEHOLDER -->", conversation_html.strip())
+
+        # Handle dynamic features
+        features_html = ""
+        for feature in personalized_content.features:
+            features_html += f'''      <div class="feature-item">
+        <h3 class="feature-title">{feature["title"]}</h3>
+        <p class="feature-desc">{feature["description"]}</p>
+      </div>
+'''
+
+        html = html.replace("      <!-- DYNAMIC_FEATURES_PLACEHOLDER -->", features_html.strip())
+
+        return html
+
+
 class EmailComposer:
     """Composes personalized cold outreach emails with voice agents using LLM intelligence."""
 
@@ -72,7 +346,8 @@ class EmailComposer:
         self,
         templates_dir: str = "pipeline/config/email_templates",
         use_llm: bool = True,
-        openrouter_config: Optional[str] = None
+        openrouter_config: Optional[str] = None,
+        business_data_dir: str = "pipeline/business_data"
     ):
         """Initialize email composer.
 
@@ -80,9 +355,11 @@ class EmailComposer:
             templates_dir: Directory containing email templates (fallback)
             use_llm: Whether to use LLM for intelligent generation
             openrouter_config: Path to OpenRouter configuration file
+            business_data_dir: Directory containing business intelligence data
         """
         self.templates_dir = Path(templates_dir)
         self.templates_dir.mkdir(parents=True, exist_ok=True)
+        self.business_data_dir = Path(business_data_dir)
         self.use_llm = use_llm
 
         # Initialize OpenRouter client for intelligent generation
@@ -94,6 +371,17 @@ class EmailComposer:
                 logger.warning(f"Failed to initialize OpenRouter client: {e}. Falling back to templates.")
                 self.use_llm = False
                 self.llm_client = None
+
+        # Initialize HTML template generator
+        try:
+            self.html_generator = HTMLTemplateGenerator(
+                html_template_path="pipeline/emails/templates/shortforge_email_cta.html",
+                openrouter_config=openrouter_config
+            )
+            logger.info("📧 Initialized HTML template generator")
+        except Exception as e:
+            logger.warning(f"Failed to initialize HTML template generator: {e}")
+            self.html_generator = None
 
         # Load fallback templates
         if not use_llm:
@@ -350,21 +638,25 @@ Best regards,
         Returns:
             AgentContext for the business
         """
-        agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent.json"
+        agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent_request.json"
 
         if agent_file.exists():
             try:
                 with open(agent_file, 'r', encoding='utf-8') as f:
-                    agent_data = json.load(f)
+                    agent_payload = json.load(f)
+
+                conversation_config = agent_payload.get("conversation_config", {})
+                agent_section = conversation_config.get("agent", {})
+                prompt_section = agent_section.get("prompt", {})
 
                 return AgentContext(
-                    agent_name=agent_data.get("agent_name", f"{business_name} Assistant"),
-                    personality=agent_data.get("personality", "professional"),
-                    tone_keywords=agent_data.get("tone_keywords", ["helpful", "knowledgeable"]),
-                    conversation_style=agent_data.get("conversation_style", "helpful"),
-                    industry=agent_data.get("industry", industry),
-                    system_prompt=agent_data.get("system_prompt", "You are a helpful assistant"),
-                    namespace=agent_data.get("namespace", f"kb:{domain}"),
+                    agent_name=agent_payload.get("name", f"{business_name} Assistant"),
+                    personality="professional",
+                    tone_keywords=["helpful", "knowledgeable", "responsive"],
+                    conversation_style="helpful",
+                    industry=industry,
+                    system_prompt=prompt_section.get("prompt", "You are a helpful assistant for this business."),
+                    namespace=f"kb:{domain}",
                     demo_url=f"https://your-app.com/voice-agent/{domain.replace('.', '_')}"
                 )
             except Exception as e:
@@ -534,6 +826,90 @@ Best regards,
 
         return notes
 
+    def compose_personalized_html_email(
+        self,
+        business_name: str,
+        domain: str,
+        industry: str,
+        lead_data: Dict,
+        business_content: Optional[Dict[str, str]] = None,
+        voice_agent_id: Optional[str] = None
+    ) -> str:
+        """Compose a personalized HTML email using LLM intelligence.
+
+        Args:
+            business_name: Name of the business
+            domain: Business domain
+            industry: Business industry
+            lead_data: Lead data dictionary
+            business_content: Business content summary
+            voice_agent_id: ElevenLabs agent ID for the widget
+
+        Returns:
+            Complete HTML email string
+        """
+        if not self.html_generator:
+            logger.warning("HTML generator not available, falling back to text template")
+            text_template = self.compose_email(
+                business_name=business_name,
+                domain=domain,
+                industry=industry,
+                recipient_email=lead_data.get("email", ""),
+                recipient_name=None,
+                voice_agent_url=None,
+                content_summary=business_content
+            )
+            return self._convert_text_to_html(text_template.body)
+
+        logger.info(f"🎨 Generating personalized HTML email for {business_name}")
+
+        # Generate personalized content
+        personalized_content = self.html_generator.generate_personalized_content(
+            business_name=business_name,
+            domain=domain,
+            industry=industry,
+            lead_data=lead_data,
+            business_content=business_content
+        )
+
+        # Set voice agent ID if provided, otherwise use environment variable
+        if voice_agent_id:
+            personalized_content.voice_agent_id = voice_agent_id
+        else:
+            personalized_content.voice_agent_id = os.getenv("ELEVENLABS_AGENT_ID", "")
+
+        # Generate final HTML
+        html_email = self.html_generator.generate_html_email(personalized_content)
+
+        logger.info(f"✅ Generated personalized HTML email for {business_name}")
+        return html_email
+
+    def _convert_text_to_html(self, text: str) -> str:
+        """Convert plain text email to basic HTML format.
+
+        Args:
+            text: Plain text email body
+
+        Returns:
+            Basic HTML formatted email
+        """
+        # Basic HTML conversion - preserve line breaks and add some styling
+        html = text.replace('\n', '<br>')
+        html = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .cta {{ background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }}
+            </style>
+        </head>
+        <body>
+            {html}
+        </body>
+        </html>
+        """
+        return html
+
     def save_email_template(self, template: EmailTemplate, emails_dir: str = "pipeline/emails") -> None:
         """Save email template to file.
 
@@ -656,7 +1032,7 @@ Best regards,
         Returns:
             Content summary by type
         """
-        data_dir = Path("pipeline/business_data") / domain.replace(".", "_")
+        data_dir = self.business_data_dir / domain.replace(".", "_")
         content_file = data_dir / "content.json"
 
         if not content_file.exists():
@@ -680,15 +1056,74 @@ Best regards,
             return {}
 
 
+def test_personalized_html_generation():
+    """Test personalized HTML email generation."""
+    import json
+
+    # Sample lead data
+    lead_data = {
+        "name": "Kaori Ema",
+        "email": "smile@prdentalstudio.com",
+        "location": "Chicago",
+        "industry": "dentist",
+        "domain": "prdentalstudio.com"
+    }
+
+    # Sample business content
+    business_content = {
+        "services": "We offer comprehensive dental services including cosmetic dentistry, restorative procedures, and preventive care. Our team specializes in advanced treatments and patient comfort.",
+        "about": "Printers Row Dental Studio has been serving Chicago for over 20 years with a commitment to exceptional patient care and the latest dental technologies.",
+        "team": "Dr. Kaori Ema leads our practice with expertise in cosmetic and general dentistry. Our skilled team provides personalized care in a comfortable environment."
+    }
+
+    composer = EmailComposer()
+
+    print("🎨 Testing personalized HTML email generation...")
+    html_email = composer.compose_personalized_html_email(
+        business_name="Printers Row Dental Studio",
+        domain="prdentalstudio.com",
+        industry="dentist",
+        lead_data=lead_data,
+        business_content=business_content,
+        voice_agent_id=os.getenv("ELEVENLABS_AGENT_ID")
+    )
+
+    # Save the generated HTML for inspection
+    with open("test_personalized_email.html", "w", encoding="utf-8") as f:
+        f.write(html_email)
+
+    print("✅ Personalized HTML email generated and saved to test_personalized_email.html")
+    print(f"📧 Email length: {len(html_email)} characters")
+
+    # Check if placeholders were replaced
+    placeholders = ["{{hero_title}}", "{{hero_subtitle}}", "{{company_name}}", "{{voice_agent_id}}"]
+    missing_placeholders = [p for p in placeholders if p in html_email]
+
+    if missing_placeholders:
+        print(f"⚠️  Warning: Some placeholders not replaced: {missing_placeholders}")
+    else:
+        print("✅ All placeholders successfully replaced")
+
+    return html_email
+
+
 def main():
     """CLI interface for email composition."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Compose personalized emails")
-    parser.add_argument("--domain", required=True, help="Business domain")
+    parser.add_argument("--domain", help="Business domain")
     parser.add_argument("--emails-dir", default="pipeline/emails", help="Emails storage directory")
+    parser.add_argument("--test-html", action="store_true", help="Test personalized HTML generation")
 
     args = parser.parse_args()
+
+    if args.test_html:
+        test_personalized_html_generation()
+        return
+
+    if not args.domain:
+        parser.error("Must specify --domain or use --test-html")
 
     composer = EmailComposer()
     template = composer.compose_email_for_lead(args.domain, args.emails_dir)

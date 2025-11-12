@@ -1,8 +1,0 @@
-{
-  "business_name": "Test Business",
-  "domain": "test.com",
-  "recipient_email": "spsardellis@gmail.com",
-  "subject": "Test ElasticEmail Integration - SupaGent Pipeline",
-  "body": "Hello,\n\nThis is a test email to verify that our ElasticEmail integration is working correctly in the SupaGent pipeline.\n\nIf you receive this email, it means the integration has been successfully implemented!\n\nBest regards,\nSupaGent Team",
-  "recipient_name": "Test Recipient"
-}

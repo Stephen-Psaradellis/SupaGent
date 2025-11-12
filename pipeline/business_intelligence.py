@@ -21,9 +21,10 @@ import os
 import re
 import time
 import xml.etree.ElementTree as ET
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -32,6 +33,7 @@ from bs4 import BeautifulSoup
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from memory.vector_store import VectorStore
+from pipeline.lead_generation import Lead, slugify
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,6 +65,90 @@ class ScrapedContent:
         }
 
 
+class HunterClient:
+    """Simple Hunter.io client for domain and contact enrichment."""
+
+    BASE_URL = "https://api.hunter.io/v2"
+
+    def __init__(self, api_key: str, session: Optional[requests.Session] = None):
+        """Initialize the Hunter.io client.
+
+        Args:
+            api_key: Hunter.io API key.
+            session: Optional shared requests session.
+        """
+        self.api_key = api_key
+        self.session = session or requests.Session()
+
+    def is_configured(self) -> bool:
+        """Return True when the client has a usable API key."""
+        return bool(self.api_key)
+
+    def domain_search(self, domain: str, limit: int = 10) -> Dict[str, Any]:
+        """Return Hunter.io domain enrichment results.
+
+        Args:
+            domain: Domain name to enrich.
+            limit: Maximum number of email records to return.
+
+        Returns:
+            Parsed JSON payload with organization and email data.
+        """
+        params = {"domain": domain, "limit": limit}
+        return self._get("domain-search", params)
+
+    def email_finder(
+        self,
+        domain: str,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        company: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Attempt to locate a direct contact email.
+
+        Args:
+            domain: Lead domain.
+            first_name: Lead first name.
+            last_name: Lead last name.
+            company: Company or organization name.
+
+        Returns:
+            Parsed JSON result with email discovery metadata.
+        """
+        params = {"domain": domain}
+        if first_name:
+            params["first_name"] = first_name
+        if last_name:
+            params["last_name"] = last_name
+        if company:
+            params["company"] = company
+        return self._get("email-finder", params)
+
+    def _get(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform a GET request against the Hunter.io API."""
+        if not self.api_key:
+            return {}
+
+        payload = params.copy()
+        payload["api_key"] = self.api_key
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/{endpoint}",
+                params=payload,
+                timeout=12,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("data") or {}
+        except requests.RequestException as exc:
+            logger.debug("Hunter.io request failed (%s): %s", endpoint, exc)
+            return {}
+        except json.JSONDecodeError as exc:
+            logger.debug("Hunter.io response parsing failed (%s): %s", endpoint, exc)
+            return {}
+
+
 class BusinessIntelligenceLoader:
     """Scrapes and vectorizes business website content."""
 
@@ -78,6 +164,7 @@ class BusinessIntelligenceLoader:
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         })
+        self.hunter_client = HunterClient(os.getenv("HUNTERIO_API_KEY", ""), self.session)
 
         # Initialize text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -402,33 +489,342 @@ class BusinessIntelligenceLoader:
         else:
             logger.warning(f"⚠️ No documents to vectorize for {domain}")
 
-    def process_business(self, domain: str, max_pages: int = 50) -> bool:
-        """Complete pipeline: scrape, categorize, and vectorize business data.
+    def process_lead(self, lead: Lead, max_pages: int = 50) -> Optional[Dict[str, Any]]:
+        """Build a comprehensive intelligence bundle for the supplied lead.
 
         Args:
-            domain: Business domain to process
-            max_pages: Maximum pages to scrape
+            lead: Lead instance loaded from the pipeline JSON exports.
+            max_pages: Maximum number of pages to crawl for website data.
 
         Returns:
-            True if successful, False otherwise
+            Dictionary containing structured intelligence or None if no signals were found.
         """
+        domain = self._resolve_domain(lead)
+        storage_dir = self._resolve_storage_dir(domain, lead)
+
+        metadata_insights = self._extract_metadata_insights(lead)
+        lead_profile = self._build_lead_profile(lead, domain, metadata_insights)
+
+        categorized_content: Dict[str, List[ScrapedContent]] = {}
+        content_summaries: Dict[str, str] = {}
+        highlights: Dict[str, List[str]] = {}
+
+        if domain:
+            categorized_content = self.load_business_data(domain, max_pages)
+            if categorized_content:
+                content_summaries = self._summarize_content(categorized_content)
+                highlights = self._extract_highlights(content_summaries)
+                try:
+                    self.vectorize_business_data(domain, categorized_content)
+                except Exception as exc:
+                    logger.debug("Vectorization failed for %s: %s", domain, exc)
+
+        hunter_data = self._enrich_with_hunter(lead, lead_profile.get("company"), domain)
+        keyword_signals = self._compute_keyword_signals(content_summaries)
+        digest = self._build_digest(lead_profile, metadata_insights, hunter_data, highlights, keyword_signals)
+
+        intelligence = {
+            "lead_profile": lead_profile,
+            "metadata_insights": metadata_insights,
+            "hunter_enrichment": hunter_data,
+            "content_summaries": content_summaries,
+            "content_highlights": highlights,
+            "keyword_signals": keyword_signals,
+            "online_presence": self._build_online_presence(lead, domain),
+            "llm_digest": digest,
+            "generated_at": int(time.time()),
+        }
+
+        if categorized_content:
+            intelligence["content_sources"] = {
+                content_type: [item.to_dict() for item in items[:3]]
+                for content_type, items in categorized_content.items()
+            }
+
+        self._persist_intelligence(storage_dir, intelligence)
+
+        return intelligence
+
+    def _resolve_domain(self, lead: Lead) -> Optional[str]:
+        """Infer an actionable domain for the lead if possible."""
+        if lead.domain and lead.domain.strip():
+            return lead.domain.strip().lower()
+
+        if lead.email and "@" in lead.email:
+            return lead.email.split("@")[-1].lower()
+
+        apollo_data = lead.metadata.get("apollo_contact_data", {}) if lead.metadata else {}
+        candidate = apollo_data.get("organization_website") or apollo_data.get("email_domain")
+        if candidate:
+            return candidate.strip().lower()
+
+        return None
+
+    def _resolve_storage_dir(self, domain: Optional[str], lead: Lead) -> Path:
+        """Resolve the filesystem directory for storing intelligence artifacts."""
+        if domain:
+            key = domain.replace(".", "_")
+        else:
+            key = slugify(lead.name or lead.source or "unknown")
+        path = self.data_dir / key
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _extract_metadata_insights(self, lead: Lead) -> Dict[str, Any]:
+        """Extract high-signal metadata from provider payloads."""
+        insights: Dict[str, Any] = {}
+        if not lead.metadata:
+            return insights
+
+        apollo_contact = lead.metadata.get("apollo_contact_data")
+        if isinstance(apollo_contact, dict):
+            contact_details = {
+                "title": apollo_contact.get("title"),
+                "organization_name": apollo_contact.get("organization_name"),
+                "organization_id": apollo_contact.get("organization_id"),
+                "city": apollo_contact.get("city"),
+                "state": apollo_contact.get("state"),
+                "country": apollo_contact.get("country"),
+                "headline": apollo_contact.get("headline"),
+                "time_zone": apollo_contact.get("time_zone"),
+                "contact_stage_id": apollo_contact.get("contact_stage_id"),
+                "owner_id": apollo_contact.get("owner_id"),
+            }
+            contact_emails = []
+            for email_entry in apollo_contact.get("contact_emails", [])[:3]:
+                contact_emails.append({
+                    "email": email_entry.get("email"),
+                    "status": email_entry.get("email_status"),
+                    "source": email_entry.get("source"),
+                    "confidence": email_entry.get("extrapolated_email_confidence"),
+                })
+
+            phone_numbers = []
+            for phone_entry in apollo_contact.get("phone_numbers", [])[:3]:
+                phone_numbers.append({
+                    "number": phone_entry.get("raw_number"),
+                    "type": phone_entry.get("type"),
+                    "status": phone_entry.get("status"),
+                })
+
+            contact_details["contact_emails"] = contact_emails
+            contact_details["phone_numbers"] = phone_numbers
+            insights["apollo_contact"] = {k: v for k, v in contact_details.items() if v}
+
+        workflow_stats = lead.metadata.get("apollo_workflow_stats")
+        if isinstance(workflow_stats, dict):
+            insights["apollo_workflow_stats"] = workflow_stats
+
+        for key in ("yelp_profile", "google_maps_profile", "bbb_profile"):
+            if key in lead.metadata:
+                insights[key] = lead.metadata[key]
+
+        return insights
+
+    def _build_lead_profile(
+        self,
+        lead: Lead,
+        domain: Optional[str],
+        metadata_insights: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Construct a normalized lead profile for downstream processing."""
+        apollo = metadata_insights.get("apollo_contact", {})
+
+        profile = {
+            "name": lead.name,
+            "title": apollo.get("title") or lead.description,
+            "company": apollo.get("organization_name"),
+            "industry": lead.industry,
+            "location": lead.location,
+            "description": lead.description,
+            "primary_email": lead.email,
+            "phone": lead.phone,
+            "score": round(float(lead.score or 0), 3),
+            "confidence": round(float(lead.confidence or 0), 3),
+            "domain": domain,
+            "source": lead.source,
+            "tags": sorted([*lead.tags]) if lead.tags else [],
+        }
+
+        if not profile["company"] and domain:
+            profile["company"] = domain.split(".")[0].replace("-", " ").title()
+
+        return {k: v for k, v in profile.items() if v not in (None, "", [], {})}
+
+    def _build_online_presence(self, lead: Lead, domain: Optional[str]) -> Dict[str, Any]:
+        """Compile public URLs and identifiers associated with the lead."""
+        presence = {
+            "domain": domain,
+            "linkedin_url": lead.linkedin_url,
+            "yelp_url": lead.yelp_url,
+            "google_maps_url": lead.google_maps_url,
+            "bbb_url": lead.bbb_url,
+            "crunchbase_url": lead.crunchbase_url,
+        }
+        return {k: v for k, v in presence.items() if v}
+
+    def _summarize_content(self, content: Dict[str, List[ScrapedContent]], clips: int = 2) -> Dict[str, str]:
+        """Return trimmed summaries for each content category."""
+        summaries: Dict[str, str] = {}
+        for content_type, items in content.items():
+            if not items:
+                continue
+            combined = " ".join(item.content for item in items[:clips])
+            summaries[content_type] = combined[:1500]
+        return summaries
+
+    def _extract_highlights(self, summaries: Dict[str, str]) -> Dict[str, List[str]]:
+        """Extract sentence-level highlights for key categories."""
+        highlights: Dict[str, List[str]] = {}
+        for key, text in summaries.items():
+            sentences = re.split(r"(?<=[.!?])\s+", text)
+            cleaned = [
+                sentence.strip()
+                for sentence in sentences
+                if 25 <= len(sentence.strip()) <= 200
+            ]
+            if cleaned:
+                highlights[key] = cleaned[:3]
+        return highlights
+
+    def _compute_keyword_signals(self, summaries: Dict[str, str]) -> Dict[str, Any]:
+        """Derive lightweight keyword signals from the available summaries."""
+        aggregate_text = " ".join(summaries.values()).lower()
+        if not aggregate_text:
+            return {}
+
+        tokens = re.findall(r"[a-zA-Z]{4,}", aggregate_text)
+        counts = Counter(tokens)
+        top_keywords = [
+            keyword for keyword, _ in counts.most_common(15)
+            if keyword not in {"https", "http", "about", "contact", "hours"}
+        ]
+
+        return {
+            "top_keywords": top_keywords[:10],
+            "total_unique_tokens": len(counts),
+        }
+
+    def _build_digest(
+        self,
+        profile: Dict[str, Any],
+        metadata_insights: Dict[str, Any],
+        hunter_data: Dict[str, Any],
+        highlights: Dict[str, List[str]],
+        keyword_signals: Dict[str, Any],
+    ) -> str:
+        """Compile a digest string optimized for prompt injection."""
+        lines = [
+            f"Lead Name: {profile.get('name')}",
+            f"Title: {profile.get('title')}" if profile.get("title") else "",
+            f"Company: {profile.get('company')}" if profile.get("company") else "",
+            f"Industry: {profile.get('industry')}" if profile.get("industry") else "",
+            f"Location: {profile.get('location')}" if profile.get("location") else "",
+        ]
+
+        if hunter_data.get("domain_search"):
+            org = hunter_data["domain_search"].get("organization")
+            employees = hunter_data["domain_search"].get("emails", [])
+            lines.append(f"Hunter Organization: {org}" if org else "")
+            if employees:
+                lines.append(f"Hunter Verified Emails: {len(employees)} records")
+
+        if keyword_signals.get("top_keywords"):
+            lines.append(f"Top Keywords: {', '.join(keyword_signals['top_keywords'][:7])}")
+
+        if highlights.get("services"):
+            lines.append("Service Highlights:")
+            lines.extend(f"- {sentence}" for sentence in highlights["services"])
+
+        apollo = metadata_insights.get("apollo_contact", {})
+        if apollo.get("contact_emails"):
+            lines.append("Apollo Contact Emails:")
+            for entry in apollo["contact_emails"]:
+                lines.append(f"- {entry.get('email')} ({entry.get('status')})")
+
+        return "\n".join(line for line in lines if line)
+
+    def _enrich_with_hunter(
+        self,
+        lead: Lead,
+        company: Optional[str],
+        domain: Optional[str],
+    ) -> Dict[str, Any]:
+        """Enrich the lead using Hunter.io when credentials are available."""
+        if not domain or not self.hunter_client.is_configured():
+            return {}
+
+        enrichment: Dict[str, Any] = {}
+        domain_data = self.hunter_client.domain_search(domain)
+        if domain_data:
+            enrichment["domain_search"] = {
+                "organization": domain_data.get("organization"),
+                "country": domain_data.get("country"),
+                "state": domain_data.get("state"),
+                "emails": [
+                    {
+                        "value": email.get("value"),
+                        "type": email.get("type"),
+                        "position": email.get("position"),
+                        "confidence": email.get("confidence"),
+                        "first_name": email.get("first_name"),
+                        "last_name": email.get("last_name"),
+                    }
+                    for email in (domain_data.get("emails") or [])[:5]
+                ],
+                "pattern": domain_data.get("pattern"),
+                "disposable": domain_data.get("disposable"),
+                "webmail": domain_data.get("webmail"),
+            }
+
+        first_name, last_name = self._split_name(lead.name)
+        if first_name and last_name:
+            finder_data = self.hunter_client.email_finder(
+                domain=domain,
+                first_name=first_name,
+                last_name=last_name,
+                company=company,
+            )
+            if finder_data:
+                enrichment["email_finder"] = {
+                    "email": finder_data.get("email"),
+                    "score": finder_data.get("score"),
+                    "verified": finder_data.get("verification", {}).get("status"),
+                }
+
+        return enrichment
+
+    def _split_name(self, name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+        """Split a human name into first and last components."""
+        if not name:
+            return None, None
+        parts = [token for token in name.strip().split() if token]
+        if not parts:
+            return None, None
+        if len(parts) == 1:
+            return parts[0], None
+        return parts[0], parts[-1]
+
+    def _persist_intelligence(self, directory: Path, intelligence: Dict[str, Any]) -> None:
+        """Persist the intelligence payload to disk."""
+        output_file = directory / "intelligence.json"
         try:
-            # Load/scrape content
-            content = self.load_business_data(domain, max_pages)
+            with open(output_file, "w", encoding="utf-8") as handle:
+                json.dump(intelligence, handle, indent=2, ensure_ascii=False)
+            logger.info("💾 Stored intelligence bundle at %s", output_file)
+        except OSError as exc:
+            logger.error("Failed to write intelligence file %s: %s", output_file, exc)
 
-            if not content:
-                logger.warning(f"❌ No content found for {domain}")
-                return False
-
-            # Vectorize content
-            self.vectorize_business_data(domain, content)
-
-            logger.info(f"🎉 Successfully processed {domain}")
-            return True
-
-        except Exception as e:
-            logger.error(f"❌ Failed to process {domain}: {e}")
-            return False
+    def process_business(self, domain: str, max_pages: int = 50) -> bool:
+        """Backward-compatible entry point using only a raw domain."""
+        lead = Lead(
+            name=domain,
+            domain=domain,
+            industry="general",
+            source="manual_import",
+        )
+        intelligence = self.process_lead(lead, max_pages=max_pages)
+        return bool(intelligence)
 
 
 def main():

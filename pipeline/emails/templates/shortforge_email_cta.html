@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShortForge Consultancy - AI Voice Agent Demo</title>
+<style>
+/* Keeping original styling for email compatibility */
+body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+img { -ms-interpolation-mode: bicubic; }
+body { margin: 0 !important; padding: 0 !important; background-color: #0a0a0a; font-family: 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; color: #ffffff; }
+.container { max-width: 600px; margin: 0 auto; background-color: #111111; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
+.header { background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%); padding: 30px; text-align: center; border-bottom: 1px solid #333333; }
+.logo { font-size: 24px; font-weight: 800; margin: 0 0 5px 0; color: #ffffff; letter-spacing: -0.5px; }
+.tagline { font-size: 12px; color: #888888; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+.hero-section { padding: 60px 30px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.hero-title { font-size: 48px; font-weight: 900; margin: 0 0 20px 0; line-height: 1.1; color: white; }
+.hero-subtitle { font-size: 18px; margin: 0 0 40px 0; line-height: 1.5; opacity: 0.9; color: rgba(255,255,255,0.9); }
+.hero-cta, .secondary-cta { display: inline-block; border-radius: 50px; font-weight: 700; text-decoration: none; }
+.hero-cta { background-color: #ffffff; color: #667eea; padding: 18px 50px; margin-bottom: 20px; }
+.secondary-cta { color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 2px; }
+.demo-section { padding: 60px 30px; background-color: #111111; text-align: center; }
+.mockup-content { color: #00ff88; font-family: 'SF Mono', monospace; font-size: 14px; line-height: 1.6; text-align: left; }
+.features-section, .pricing-section, .urgency-section, .footer { padding: 60px 30px; text-align: center; }
+.feature-title { font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 10px; }
+.feature-desc { color: #888888; line-height: 1.6; }
+.pricing-title { font-size: 36px; font-weight: 800; color: #ffffff; margin-bottom: 15px; }
+.pricing-subtitle { font-size: 16px; color: #888888; margin-bottom: 40px; }
+.footer { background-color: #000000; border-top: 1px solid #333333; }
+.footer-text { color: #666666; font-size: 14px; margin-bottom: 20px; }
+.footer-link { color: #888888; text-decoration: none; margin: 0 15px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">
+    See how an AI voice agent can handle customer calls and workflows for your team.
+  </span>
+  <div class="container">
+    <div class="header">
+      <h1 class="logo">ShortForge Consultancy</h1>
+      <p class="tagline">Intelligent Automation Systems</p>
+    </div>
+
+    <div class="hero-section">
+      <h1 class="hero-title">{{hero_title}}</h1>
+      <p class="hero-subtitle">{{hero_subtitle}}</p>
+      <a href="#voice-agent" class="hero-cta">Talk to Our Voice Agent</a><br>
+      <a href="https://shortforge.dev/contact" class="secondary-cta">Book a Free Consultation</a>
+    </div>
+
+    <div id="voice-agent" class="demo-section">
+      <h2 style="color:white;margin-bottom:20px;">Talk to Forge</h2>
+      <p style="color:#ccc;">Forge already knows about {{company_name}}'s workflow — ask it how we could optimize your team's process.</p>
+      <div class="mockup-content">
+        <!-- DYNAMIC_CONVERSATION_PLACEHOLDER -->
+      </div>
+      <elevenlabs-convai agent-id="{{voice_agent_id}}"></elevenlabs-convai><script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+    </div>
+
+    <div class="features-section">
+      <h2 style="color:white;margin-bottom:30px;">Why Businesses Choose Forge</h2>
+      <!-- DYNAMIC_FEATURES_PLACEHOLDER -->
+    </div>
+
+    <div class="pricing-section">
+      <h2 class="pricing-title">{{pricing_title}}</h2>
+      <p class="pricing-subtitle">{{pricing_subtitle}}</p>
+      <div style="background:#1a1a1a;padding:30px;border-radius:20px;max-width:400px;margin:0 auto;border:2px solid #667eea;">
+        <h3 style="color:#888;text-transform:uppercase;letter-spacing:1px;">Professional Plan</h3>
+        <h1 style="color:#fff;font-size:48px;margin:10px 0;">From $99/mo</h1>
+        <p style="color:#888;">per agent</p>
+        <ul style="list-style:none;padding:0;color:#ccc;text-align:left;margin-top:20px;">
+          <li>✓ Voice + workflow agent setup</li>
+          <li>✓ CRM and API integrations</li>
+          <li>✓ 24/7 uptime monitoring</li>
+          <li>✓ Free onboarding call</li>
+        </ul>
+        <a href="https://shortforge.dev/contact" style="display:inline-block;margin-top:25px;background:linear-gradient(135deg,#667eea,#764ba2);padding:16px 40px;border-radius:30px;color:white;font-weight:700;text-decoration:none;">Start Your Trial</a>
+      </div>
+    </div>
+
+    <div class="urgency-section" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);color:white;padding:40px 30px;">
+      <h3 style="font-size:24px;font-weight:700;margin-bottom:15px;">{{urgency_title}}</h3>
+      <p style="font-size:16px;opacity:0.9;margin-bottom:25px;">{{urgency_text}}</p>
+      <a href="https://shortforge.dev/contact" style="display:inline-block;background:white;color:#dc2626;padding:16px 40px;border-radius:25px;font-weight:700;text-decoration:none;">Reserve Your Spot</a>
+    </div>
+
+    <div class="footer">
+      <p class="footer-text">© 2025 ShortForge Consultancy — building intelligent automation systems that think, talk, and act.</p>
+      <div>
+        <a href="https://shortforge.dev/privacy" class="footer-link">Privacy Policy</a>
+        <a href="https://shortforge.dev/terms" class="footer-link">Terms</a>
+        <a href="https://shortforge.dev/contact" class="footer-link">Contact</a>
+      </div>
+      <p class="footer-text" style="margin-top:16px;">
+        Prefer fewer emails? <a href="{{unsubscribe_url}}" class="footer-link">Unsubscribe</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

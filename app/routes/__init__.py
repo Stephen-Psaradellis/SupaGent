@@ -18,6 +18,7 @@ from app.routes import (
     agent_tests,
     config,
 )
+from app.routes import unsubscribe
 
 def register_routes(router: APIRouter) -> None:
     """Register all route modules with the main router.
@@ -38,4 +39,5 @@ def register_routes(router: APIRouter) -> None:
     router.include_router(crm.router, tags=["crm"])
     router.include_router(compliance.router, tags=["compliance"])
     router.include_router(agent_tests.router, tags=["agent-tests"])
+    router.include_router(unsubscribe.router, tags=["unsubscribe"])
 

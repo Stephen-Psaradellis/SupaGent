@@ -1,0 +1,15 @@
+{
+  "domain": "",
+  "agent_name": "Bindu Vemaraju Assistant",
+  "system_prompt": "",
+  "voice_id": null,
+  "personality": "professional",
+  "industry": "dentist",
+  "tone_keywords": [
+    "helpful",
+    "knowledgeable",
+    "responsive"
+  ],
+  "conversation_style": "helpful",
+  "namespace": "kb:"
+}

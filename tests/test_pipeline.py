@@ -23,7 +23,6 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 from pipeline.lead_generation import (
-    GooglePlacesConnector,
     HTTPResult,
     Lead,
     LeadGenerator,
@@ -105,69 +104,6 @@ class TestLeadGeneration(unittest.TestCase):
 
         self.assertEqual(hash1, hash2)  # Same lead
         self.assertNotEqual(hash1, hash3)  # Different email
-
-    def test_google_places_connector_parses_results(self):
-        """Ensure Google Places connector normalizes API results."""
-
-        settings = LeadPipelineSettings.from_env(
-            leads_dir=Path(self.temp_dir),
-            cache_path=Path(self.temp_dir) / "cache.sqlite3",
-            google_places_api_key="dummy-key",
-        )
-
-        connector = GooglePlacesConnector()
-
-        class StubHTTP:
-            """Stub HTTP client returning canned responses."""
-
-            async def get(self, url, **kwargs):
-                if "textsearch" in url:
-                    return HTTPResult(
-                        url=url,
-                        status_code=200,
-                        headers={},
-                        json={
-                            "results": [
-                                {
-                                    "place_id": "abc123",
-                                    "name": "Test Dental",
-                                    "formatted_address": "123 Main St",
-                                    "types": ["dentist"],
-                                }
-                            ]
-                        },
-                    )
-                return HTTPResult(
-                    url=url,
-                    status_code=200,
-                    headers={},
-                    json={
-                        "result": {
-                            "name": "Test Dental",
-                            "website": "https://example.com",
-                            "formatted_address": "123 Main St",
-                            "formatted_phone_number": "+1-312-555-1000",
-                            "url": "https://maps.google.com/?cid=abc123",
-                            "business_status": "OPERATIONAL",
-                        }
-                    },
-                )
-
-        context = LeadPipelineContext(
-            settings=settings,
-            cache=self.generator.cache,
-            http=StubHTTP(),
-        )
-        query = LeadQuery(industry="dentists", location="Chicago, IL", limit=5)
-        leads = asyncio.run(connector.fetch(query, context))
-
-        self.assertIsInstance(leads, list)
-        self.assertTrue(leads)
-        lead = leads[0]
-        self.assertIsInstance(lead, Lead)
-        self.assertEqual(lead.domain, "example.com")
-        self.assertEqual(lead.source, connector.name)
-
 
 class TestBusinessIntelligence(unittest.TestCase):
     """Test business intelligence loader."""
@@ -528,16 +464,18 @@ class TestLLMEmailComposer(unittest.TestCase):
         agent_dir.mkdir(parents=True, exist_ok=True)
 
         agent_config = {
-            "agent_name": "Test Assistant",
-            "personality": "professional",
-            "tone_keywords": ["helpful", "knowledgeable"],
-            "conversation_style": "helpful",
-            "industry": "dentists",
-            "system_prompt": "You are a helpful assistant",
-            "namespace": "kb:testdomain.com"
+            "name": "Test Assistant",
+            "conversation_config": {
+                "agent": {
+                    "language": "en-US",
+                    "prompt": {
+                        "prompt": "You are a helpful assistant"
+                    }
+                }
+            }
         }
 
-        with open(agent_dir / "agent.json", 'w') as f:
+        with open(agent_dir / "agent_request.json", 'w') as f:
             json.dump(agent_config, f)
 
         # Test loading
@@ -547,7 +485,6 @@ class TestLLMEmailComposer(unittest.TestCase):
         )
 
         self.assertEqual(agent_context.agent_name, "Test Assistant")
-        self.assertEqual(agent_context.personality, "professional")
         self.assertIn("helpful", agent_context.tone_keywords)
 
     @patch('pipeline.email_composer.OpenRouterClient')
@@ -608,7 +545,7 @@ class TestPipelineIntegration(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch('pipeline.lead_generation.LeadGenerator.generate_leads')
-    @patch('pipeline.business_intelligence.BusinessIntelligenceLoader.process_business')
+    @patch('pipeline.business_intelligence.BusinessIntelligenceLoader.process_lead')
     @patch('pipeline.voice_agent_generator.VoiceAgentGenerator.generate_agent_for_business')
     @patch('pipeline.email_composer.EmailComposer.compose_email_for_lead')
     def test_full_pipeline_execution(self, mock_compose, mock_agent, mock_process, mock_leads):
@@ -619,13 +556,12 @@ class TestPipelineIntegration(unittest.TestCase):
         ]
 
         # Mock business processing
-        mock_process.return_value = True
+        mock_process.return_value = {"lead_profile": {"name": "Test Dental"}}
 
         # Mock agent generation
         mock_agent.return_value = AgentConfig(
             domain="testdental.com",
-            agent_name="Test Dental Assistant",
-            system_prompt="Test prompt"
+            request_payload={"name": "Test Dental Assistant"}
         )
 
         # Mock email composition
@@ -635,7 +571,7 @@ class TestPipelineIntegration(unittest.TestCase):
 
         results = self.pipeline.run_full_pipeline("dentists", "Chicago, IL", max_leads=5)
 
-        self.assertEqual(results["leads_generated"], 1)
+        self.assertEqual(results["leads_loaded"], 1)
         self.assertEqual(results["businesses_processed"], 1)
         self.assertEqual(results["agents_created"], 1)
         self.assertEqual(results["emails_composed"], 1)

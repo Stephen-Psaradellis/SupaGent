@@ -107,7 +107,7 @@ class ApolloConnector:
     BASE_URL = "https://api.apollo.io/api/v1"
     SEARCH_URL = f"{BASE_URL}/mixed_people/search"
     CONTACTS_SEARCH_URL = f"{BASE_URL}/contacts/search"
-    BULK_ENRICH_URL = f"{BASE_URL}/people/bulk_enrich"
+    BULK_ENRICH_URL = f"{BASE_URL}/people/bulk_match"
     BULK_CREATE_CONTACTS_URL = f"{BASE_URL}/contacts/bulk_create"
 
     def __init__(self, api_key: Optional[str] = None):
@@ -160,7 +160,7 @@ class ApolloConnector:
             limit: Maximum number of results to return
 
         Returns:
-            List of ApolloContact objects
+            List of ApolloContact objects (may include people without emails)
         """
         if job_titles is None:
             job_titles = ["owner", "director", "general manager", "partner"]
@@ -170,11 +170,10 @@ class ApolloConnector:
             industry_keywords=industry,
             location=location,
             page=1,
-            per_page=min(limit, 100) # Apollo limits to 100 per page
+            per_page=100  # Always use max page size to minimize API calls
         )
 
         contacts = []
-        seen_emails: Set[str] = set()
         total_raw_results = 0
 
         while len(contacts) < limit:
@@ -194,6 +193,7 @@ class ApolloConnector:
                 people = data.get("people", [])
 
                 if not people:
+                    logger.info(f"No people found on page {filters.page}, stopping")
                     break
 
                 total_raw_results += len(people)
@@ -201,23 +201,23 @@ class ApolloConnector:
 
                 for person_data in people:
                     contact = ApolloContact.from_api_response(person_data)
-
-                    # Skip if we've already seen this email
-                    if contact.email and contact.email in seen_emails:
-                        logger.debug(f"Skipping duplicate email: {contact.email}")
-                        continue
-
                     contacts.append(contact)
 
-                    if contact.email:
-                        seen_emails.add(contact.email)
-
                     if len(contacts) >= limit:
+                        logger.info(f"Reached limit of {limit} contacts, stopping pagination")
                         break
 
                 # Check if there are more pages
                 pagination = data.get("pagination", {})
-                if not pagination.get("has_next_page", False):
+                current_page = pagination.get("page", filters.page)
+                total_pages = pagination.get("total_pages", 1)
+                total_entries = pagination.get("total_entries", 0)
+
+                # Check if we've reached the last page or hit our limit
+                if current_page >= total_pages:
+                    break
+
+                if len(contacts) >= limit:
                     break
 
                 filters.page += 1
@@ -226,7 +226,7 @@ class ApolloConnector:
                 logger.error(f"Error searching Apollo people: {e}")
                 break
 
-        logger.info(f"Total people found: {len(contacts)} (from {total_raw_results} raw results, filtered to {len(seen_emails)} unique emails)")
+        logger.info(f"Total people found: {len(contacts)} (from {total_raw_results} raw results)")
         return contacts[:limit]
 
     async def search_existing_contacts(
@@ -289,49 +289,111 @@ class ApolloConnector:
 
     async def bulk_enrich_people(
         self,
-        people_ids: List[str],
+        contacts: List[ApolloContact],
     ) -> List[ApolloContact]:
         """
-        Bulk enrich people with additional data using Apollo's bulk enrichment.
+        Bulk enrich people with additional data using Apollo's bulk people enrichment.
+        Handles batching since the API only allows up to 10 people per request.
 
         Args:
-            people_ids: List of Apollo person IDs to enrich
+            contacts: List of ApolloContact objects to enrich
 
         Returns:
             List of enriched ApolloContact objects
         """
-        if not people_ids:
+        if not contacts:
             return []
 
-        payload = {
-            "ids": people_ids,
-            "include_all_details": True,
-        }
+        # Prepare details for bulk enrichment
+        valid_contacts = []
+        for contact in contacts:
+            detail = {}
 
-        try:
-            logger.info(f"Bulk enriching {len(people_ids)} people")
+            # Add identifying information - the API prefers specific identifiers over IDs
+            # Don't include placeholder emails
+            if contact.email and not contact.email.startswith("email_not_unlocked"):
+                detail["email"] = contact.email
+            if contact.first_name:
+                detail["first_name"] = contact.first_name
+            if contact.last_name:
+                detail["last_name"] = contact.last_name
+            if contact.organization_name:
+                detail["organization_name"] = contact.organization_name
+            if contact.organization_website:
+                detail["website"] = contact.organization_website
+            if contact.title:
+                detail["title"] = contact.title
 
-            response = self.http_client.post(
-                self.BULK_ENRICH_URL,
-                json=payload,
-                headers=self._get_headers(),
-            )
-            response.raise_for_status()
+            # Only include if we have meaningful identifying information
+            # Require at least name + organization or email
+            has_email = bool(contact.email and not contact.email.startswith("email_not_unlocked"))
+            has_name = bool(contact.first_name or contact.last_name)
+            has_org = bool(contact.organization_name or contact.organization_website)
 
-            data = response.json()
-            enriched_people = data.get("people", [])
+            if has_email or (has_name and has_org):
+                # Store the detail with the contact for batching
+                contact._enrich_detail = detail
+                valid_contacts.append(contact)
+            else:
+                logger.debug(f"Skipping contact with insufficient identifying info: {contact.first_name} {contact.last_name} at {contact.organization_name}")
 
-            contacts = []
-            for person_data in enriched_people:
-                contact = ApolloContact.from_api_response(person_data)
-                contacts.append(contact)
-
-            logger.info(f"Successfully enriched {len(contacts)} people")
+        if not valid_contacts:
+            logger.warning("No valid contacts to enrich")
             return contacts
 
-        except Exception as e:
-            logger.error(f"Error bulk enriching people: {e}")
-            return []
+        # Process in batches of 10 (API limit)
+        batch_size = 10
+        all_enriched_contacts = []
+
+        for i in range(0, len(valid_contacts), batch_size):
+            batch_contacts = valid_contacts[i:i + batch_size]
+            batch_details = [contact._enrich_detail for contact in batch_contacts]
+
+            payload = {
+                "details": batch_details,
+                "reveal_personal_emails": True,
+            }
+
+            logger.debug(f"Bulk enriching batch {i//batch_size + 1} with {len(batch_details)} people")
+
+            try:
+                response = self.http_client.post(
+                    self.BULK_ENRICH_URL,
+                    json=payload,
+                    headers=self._get_headers(),
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                matches = data.get("matches", [])
+
+                logger.debug(f"Batch {i//batch_size + 1} response summary: {data.get('total_requested_enrichments')} requested, {data.get('unique_enriched_records')} enriched")
+
+                enriched_count = 0
+                for match_data in matches:
+                    if match_data is not None:  # Skip null matches
+                        contact = ApolloContact.from_api_response(match_data)
+                        all_enriched_contacts.append(contact)
+                        enriched_count += 1
+
+                logger.debug(f"Batch {i//batch_size + 1} processed {enriched_count} enriched people")
+
+                logger.debug(f"Successfully enriched batch {i//batch_size + 1} ({enriched_count} people)")
+
+            except Exception as e:
+                logger.error(f"Error bulk enriching batch {i//batch_size + 1}: {e}")
+                # Try to get more details from the response
+                try:
+                    if hasattr(e, 'response') and e.response:
+                        logger.error(f"Response status: {e.response.status_code}")
+                        logger.error(f"Response body: {e.response.text[:500]}")
+                except:
+                    pass
+                # For failed batches, return the original contacts
+                all_enriched_contacts.extend(batch_contacts)
+
+        logger.info(f"Successfully enriched {len(all_enriched_contacts)} people in {len(valid_contacts)//batch_size + 1} batches")
+        return all_enriched_contacts
 
     async def bulk_create_contacts(
         self,
@@ -382,8 +444,9 @@ class ApolloConnector:
             response.raise_for_status()
 
             data = response.json()
-            results = data.get("contacts", [])
+            results = data.get("created_contacts", [])
 
+            logger.debug(f"Bulk create response contains {len(results)} created contacts")
             logger.info(f"Successfully created contacts. Results: {len(results)}")
             return results
 
@@ -462,13 +525,7 @@ class ApolloConnector:
 
         # Step 3: Bulk enrich new people
         logger.info(f"Step 3: Bulk enriching {len(new_people)} new people...")
-        person_ids = [p.id for p in new_people if p.id]
-
-        if person_ids:
-            enriched_contacts = await self.bulk_enrich_people(person_ids)
-        else:
-            logger.warning("No person IDs available for enrichment, using original data")
-            enriched_contacts = new_people
+        enriched_contacts = await self.bulk_enrich_people(new_people)
 
         # Step 4: Bulk create contacts
         logger.info(f"Step 4: Bulk creating {len(enriched_contacts)} contacts...")

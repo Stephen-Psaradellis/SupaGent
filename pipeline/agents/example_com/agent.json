@@ -1,0 +1,15 @@
+{
+  "domain": "example.com",
+  "agent_name": "Example Business Assistant",
+  "system_prompt": "",
+  "voice_id": null,
+  "personality": "professional",
+  "industry": "general",
+  "tone_keywords": [
+    "helpful",
+    "knowledgeable",
+    "responsive"
+  ],
+  "conversation_style": "helpful",
+  "namespace": "kb:example.com"
+}

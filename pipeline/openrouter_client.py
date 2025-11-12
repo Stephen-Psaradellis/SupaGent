@@ -306,6 +306,144 @@ class OpenRouterClient:
         # Parse and validate the response
         return self._parse_system_prompt_response(response, business_context)
 
+    def generate_agent_blueprint(
+        self,
+        lead_profile: Dict[str, Any],
+        business_intelligence: Dict[str, Any],
+        industry: str,
+    ) -> Dict[str, Any]:
+        """Generate dynamic agent blueprint fields via GPT-4o-mini.
+
+        Args:
+            lead_profile: Normalized lead profile dictionary.
+            business_intelligence: Intelligence bundle from the pipeline.
+            industry: Industry descriptor for the business.
+
+        Returns:
+            Dictionary containing `name`, `first_message`, `language`, `system_prompt`, and optional tags.
+        """
+        trimmed_intelligence = self._trim_intelligence_payload(business_intelligence)
+        trimmed_intelligence["industry"] = industry
+
+        # Ensure the prompt remains compact while retaining critical context.
+        lead_context_json = json.dumps(lead_profile, indent=2, ensure_ascii=False)
+        intelligence_json = json.dumps(trimmed_intelligence, indent=2, ensure_ascii=False)
+
+        prompt = f"""You are an elite voice AI prompt engineer working on ElevenLabs Conversational AI agents.
+
+Follow the official documentation to craft a production-ready system prompt and conversational framing.
+
+## OFFICIAL ELEVENLABS DOCUMENTATION
+{self.elevenlabs_docs}
+
+## OBJECTIVE
+- Create a JSON blueprint describing the agent name, opening message, language, system prompt, and relevant tags.
+- The system prompt MUST follow the documentation structure (Role, Business Context, Communication Style, Guidelines, Response Best Practices, Boundaries & Escalation, Response Format).
+- The system prompt should be optimized for spoken delivery (concise sentences, natural transitions, empathy).
+- The agent will later be assigned voice_id "j57KDF72L6gxbLk4sOo5" (do not include this in the JSON; it is provided for context).
+
+## LEAD PROFILE
+{lead_context_json}
+
+## BUSINESS INTELLIGENCE
+{intelligence_json}
+
+## OUTPUT REQUIREMENTS
+Return ONLY a JSON object with the following structure (no markdown code fences):
+{{
+  "name": "Short, on-brand agent name (e.g. '{lead_profile.get('company') or lead_profile.get('name')} AI Concierge')",
+  "first_message": "Warm greeting introducing the business and offering help in <90 words",
+  "language": "Locale code such as 'en-US'",
+  "system_prompt": "Full markdown-formatted system prompt following the official documentation",
+  "tags": ["industry:<industry>", "source:voice_agent_pipeline", "... optional additional tags"]
+}}
+
+- Ensure `first_message` is conversational, welcoming, and references the business by name.
+- If the business serves customers in English, default to language 'en-US' unless strong evidence suggests otherwise.
+- Keep `tags` concise (3-5 items max) and include the industry.
+- Do NOT include any surrounding commentary.
+"""
+
+        response = self._call_openrouter(
+            prompt,
+            model="openai/gpt-4o-mini",
+            temperature=0.35,
+            max_tokens=3200,
+        )
+
+        blueprint = self._parse_json_response(response)
+
+        if not blueprint:
+            logger.warning("Agent blueprint generation failed; using fallback blueprint.")
+            blueprint = {
+                "name": f"{lead_profile.get('company') or lead_profile.get('name', 'Business')} AI Assistant",
+                "first_message": (
+                    f"Hi there! This is the AI assistant for {lead_profile.get('company') or lead_profile.get('name')}. "
+                    "I can help with services, availability, and next steps. How can I support you today?"
+                ),
+                "language": "en-US",
+                "system_prompt": self._fallback_system_prompt(lead_profile, industry),
+                "tags": [f"industry:{industry}", "source:voice_agent_pipeline"],
+            }
+
+        blueprint.setdefault("language", "en-US")
+        if not blueprint.get("name"):
+            blueprint["name"] = f"{lead_profile.get('company') or lead_profile.get('name', 'Business')} AI Assistant"
+        if not blueprint.get("first_message"):
+            blueprint["first_message"] = (
+                f"Hello! I'm the AI assistant for {lead_profile.get('company') or lead_profile.get('name')}. "
+                "How may I help you today?"
+            )
+        if not blueprint.get("system_prompt"):
+            blueprint["system_prompt"] = self._fallback_system_prompt(lead_profile, industry)
+        if not blueprint.get("tags"):
+            blueprint["tags"] = [f"industry:{industry}", "source:voice_agent_pipeline"]
+
+        return blueprint
+
+    def _fallback_system_prompt(self, lead_profile: Dict[str, Any], industry: str) -> str:
+        """Fallback system prompt used when LLM generation fails."""
+        company = lead_profile.get("company") or lead_profile.get("name", "the business")
+        description = lead_profile.get("description") or f"{company} is a trusted {industry} provider."
+
+        return f"""# {company} AI Assistant
+
+## Role
+You are {company}'s official AI voice assistant. You greet callers, answer questions about services, and guide them to the right next steps.
+
+## Business Context
+{description}
+
+## Communication Style
+- **Personality**: Professional and reassuring
+- **Tone**: Warm, knowledgeable, and patient
+- **Approach**: Conversational while staying focused on helping the caller quickly
+
+## Guidelines for Interaction
+1. Acknowledge the caller's request and use their name if provided.
+2. Reference {company}'s services and strengths when answering questions.
+3. Ask clarifying questions when needed to provide accurate information.
+4. Offer to schedule appointments, provide contact details, or escalate to a human when appropriate.
+5. Keep answers succinct while covering critical information.
+
+## Response Best Practices
+- Begin with a friendly greeting and a short summary of how you can help.
+- Provide clear, actionable information using natural spoken language.
+- Highlight relevant service offerings or differentiators.
+- Close with a helpful question or suggested next step.
+
+## Boundaries & Escalation
+- Do not provide pricing or guarantees unless explicitly stated by {company}.
+- If the caller needs urgent assistance or highly specialized help, escalate to a human team member.
+- Avoid answering questions outside of {company}'s scope of services.
+
+## Response Format
+- Keep spoken responses between 30-90 seconds.
+- Use short sentences and natural transitions.
+- Offer one or two concrete next steps when helpful.
+
+Remember: You represent {company}. Every interaction should reinforce trust, expertise, and care."""
+
     def _build_system_prompt_generation_prompt(
         self,
         business: BusinessContext,
@@ -457,6 +595,38 @@ You are {business.name}'s AI assistant, specializing in {business.industry}.
 
 Remember: You are the voice of {business.name}. Every interaction should build trust and demonstrate expertise."""
 
+    def _parse_json_response(self, response: str) -> Dict[str, Any]:
+        """Parse raw LLM output into a JSON object."""
+        text = response.strip()
+
+        if "```json" in text:
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in text:
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+
+        def _attempt_parse(candidate: str) -> Optional[Dict[str, Any]]:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                return None
+            return None
+
+        parsed = _attempt_parse(text)
+        if parsed is not None:
+            return parsed
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            parsed = _attempt_parse(text[start:end + 1])
+            if parsed is not None:
+                return parsed
+
+        logger.warning("Failed to parse JSON from LLM response: %s", text[:200])
+        return {}
+
     def generate_email_template(
         self,
         business_context: BusinessContext,
@@ -577,6 +747,74 @@ Remember: You are the voice of {business.name}. Every interaction should build t
 
         return insights.get(industry.lower().replace(" ", "_"), "General business insights and value propositions")
 
+    def _trim_intelligence_payload(self, intelligence: Dict[str, Any]) -> Dict[str, Any]:
+        """Reduce raw intelligence payload to the most relevant, LLM-friendly fields.
+
+        Args:
+            intelligence: Complete intelligence dictionary from the pipeline.
+
+        Returns:
+            Trimmed dictionary safe to embed inside prompts.
+        """
+        if not intelligence:
+            return {}
+
+        trimmed: Dict[str, Any] = {}
+
+        digest = intelligence.get("llm_digest")
+        if digest:
+            trimmed["digest"] = digest[:2000]
+
+        content_highlights = intelligence.get("content_highlights") or {}
+        trimmed_highlights: Dict[str, List[str]] = {}
+        for key, highlights in content_highlights.items():
+            if isinstance(highlights, list) and highlights:
+                trimmed_highlights[key] = highlights[:3]
+        if trimmed_highlights:
+            trimmed["content_highlights"] = trimmed_highlights
+
+        keyword_signals = intelligence.get("keyword_signals")
+        if keyword_signals:
+            trimmed["keyword_signals"] = keyword_signals
+
+        hunter = intelligence.get("hunter_enrichment")
+        if hunter:
+            domain_search = hunter.get("domain_search") or {}
+            trimmed_hunter = {
+                "organization": domain_search.get("organization"),
+                "pattern": domain_search.get("pattern"),
+                "emails": [
+                    {
+                        "value": email.get("value"),
+                        "type": email.get("type"),
+                        "confidence": email.get("confidence"),
+                        "position": email.get("position"),
+                    }
+                    for email in (domain_search.get("emails") or [])[:3]
+                ],
+                "email_finder": hunter.get("email_finder"),
+            }
+            trimmed["hunter"] = trimmed_hunter
+
+        metadata = intelligence.get("metadata_insights")
+        if metadata:
+            apollo = metadata.get("apollo_contact")
+            if apollo:
+                trimmed["apollo"] = {
+                    "title": apollo.get("title"),
+                    "organization_name": apollo.get("organization_name"),
+                    "city": apollo.get("city"),
+                    "state": apollo.get("state"),
+                    "contact_emails": apollo.get("contact_emails"),
+                    "phone_numbers": apollo.get("phone_numbers"),
+                }
+
+        lead_profile = intelligence.get("lead_profile")
+        if lead_profile:
+            trimmed["lead_profile"] = lead_profile
+
+        return trimmed
+
     def _build_email_generation_prompt(
         self,
         business: BusinessContext,
@@ -665,25 +903,39 @@ Generate the email now:"""
 
         return prompt
 
-    def _call_openrouter(self, prompt: str) -> str:
+    def _call_openrouter(
+        self,
+        prompt: str,
+        *,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
         """Call OpenRouter API with the given prompt.
 
         Args:
             prompt: The prompt to send to the LLM
+            model: Optional override for the model identifier.
+            temperature: Optional temperature override.
+            max_tokens: Optional max token override.
 
         Returns:
             LLM response as string
         """
+        model_name = model or self.config.model
+        request_temperature = temperature if temperature is not None else self.config.temperature
+        request_max_tokens = max_tokens or self.config.max_tokens
+
         payload = {
-            "model": self.config.model,
+            "model": model_name,
             "messages": [
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "temperature": self.config.temperature,
-            "max_tokens": self.config.max_tokens,
+            "temperature": request_temperature,
+            "max_tokens": request_max_tokens,
         }
 
         try:
