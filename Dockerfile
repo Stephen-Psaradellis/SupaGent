@@ -10,8 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 ARG DOPPLER_TOKEN
 
-RUN --mount=type=cache,id=cache-apt-cache,target=/var/cache/apt \
-    --mount=type=cache,id=cache-apt-lists,target=/var/lib/apt/lists \
+RUN --mount=type=cache,id=cacheKey-apt-cache,target=/var/cache/apt \
+    --mount=type=cache,id=cacheKey-apt-lists,target=/var/lib/apt/lists \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
