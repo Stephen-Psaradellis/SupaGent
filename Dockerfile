@@ -8,9 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,sharing=locked,target=/var/lib/apt/lists \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         gcc \
@@ -24,8 +22,7 @@ WORKDIR /app
 
 # Install Python dependencies with cacheable pip wheel cache
 COPY requirements.txt .
-RUN --mount=type=cache,sharing=locked,target=/root/.cache/pip \
-    python -m pip install --upgrade pip setuptools wheel && \
+RUN python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --user -r requirements.txt
 
 FROM python:3.11-slim
@@ -38,9 +35,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     BROWSER_USE_HEADLESS=1 \
     BROWSER_USE_DISABLE_SECURITY=1
 
-RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
-    --mount=type=cache,sharing=locked,target=/var/lib/apt/lists \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         apt-transport-https \
         ca-certificates \
@@ -70,8 +65,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
 COPY --from=builder /root/.local /root/.local
 
 # Install Playwright browsers (depends on runtime libs already installed)
-RUN --mount=type=cache,sharing=locked,target=/root/.cache/ms-playwright \
-    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
+RUN PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
     playwright install --with-deps
 
 WORKDIR /app
