@@ -193,36 +193,43 @@ class BusinessIntelligenceLoader:
         # Try database first, fallback to file storage
         try:
             with get_db_session() as session:
-                # Check if domain exists and has content
+                # Check if domain exists
                 business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
 
-            if business_domain and business_domain.scraped_contents:
-                logger.info(f"📁 Loading cached content for {domain} from database")
-                # Load from database
-                categorized_content = {}
-                for scraped in business_domain.scraped_contents:
-                    content_type = scraped.content_type
-                    if content_type not in categorized_content:
-                        categorized_content[content_type] = []
-
-                    scraped_obj = ScrapedContent(
-                        url=scraped.url,
-                        title=scraped.title,
-                        content=scraped.content,
-                        content_type=scraped.content_type,
-                        metadata=scraped.metadata_json or {}
+                scraped_rows: List[ScrapedContent] = []
+                if business_domain:
+                    # The schema uses an explicit FK column (`domain_id`); query via that column to
+                    # stay aligned with the ORM mappings rather than relying on implicit lazy relationships.
+                    scraped_rows = (
+                        session.query(ScrapedContent)
+                        .filter_by(domain_id=business_domain.id)
+                        .order_by(ScrapedContent.id)
+                        .all()
                     )
-                    categorized_content[content_type].append(scraped_obj)
 
-                return categorized_content
-            else:
+                if scraped_rows:
+                    logger.info(f"📁 Loading cached content for {domain} from database")
+                    categorized_content = {}
+                    for scraped in scraped_rows:
+                        content_type = scraped.content_type
+                        categorized_content.setdefault(content_type, [])
+                        scraped_obj = ScrapedContent(
+                            url=scraped.url,
+                            title=scraped.title,
+                            content=scraped.content,
+                            content_type=scraped.content_type,
+                            metadata=scraped.metadata_json or {},
+                        )
+                        categorized_content[content_type].append(scraped_obj)
+
+                    return categorized_content
+
                 # Scrape fresh content
                 content = self._scrape_website(f"https://{domain}", max_pages)
 
                 # Categorize content
                 categorized_content = self._categorize_content(content)
 
-                # Save to database
                 if not business_domain:
                     business_domain = BusinessDomain(domain=domain)
                     session.add(business_domain)
@@ -238,16 +245,17 @@ class BusinessIntelligenceLoader:
                             content=item.content,
                             content_type=item.content_type,
                             metadata_json=item.metadata,
-                            scraped_at=datetime.fromtimestamp(item.metadata.get("scraped_at", time.time()))
+                            scraped_at=datetime.fromtimestamp(item.metadata.get("scraped_at", time.time())),
                         )
                         session.add(scraped_db)
 
-                logger.info(f"💾 Saved {sum(len(items) for items in categorized_content.values())} pages for {domain} to database")
+                logger.info(
+                    f"💾 Saved {sum(len(items) for items in categorized_content.values())} pages for {domain} to database"
+                )
                 return categorized_content
 
         except Exception as exc:
             logger.warning(f"Database not available, falling back to file storage: {exc}")
-            # Fallback to file-based storage
             return self._load_business_data_fallback(domain, max_pages)
 
     def _scrape_website(self, base_url: str, max_pages: int) -> List[ScrapedContent]:
