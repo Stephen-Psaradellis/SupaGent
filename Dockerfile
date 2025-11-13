@@ -8,8 +8,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-ARG DOPPLER_TOKEN
-
 RUN --mount=type=cache,cacheKey=apt-cache,target=/var/cache/apt \
     --mount=type=cache,cacheKey=apt-lists,target=/var/lib/apt/lists \
     apt-get update && \
