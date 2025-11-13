@@ -201,9 +201,9 @@ class BusinessIntelligenceLoader:
                     # The schema uses an explicit FK column (`domain_id`); query via that column to
                     # stay aligned with the ORM mappings rather than relying on implicit lazy relationships.
                     scraped_rows = (
-                        session.query(ScrapedContent)
+                        session.query(ScrapedContentModel)
                         .filter_by(domain_id=business_domain.id)
-                        .order_by(ScrapedContent.id)
+                        .order_by(ScrapedContentModel.id)
                         .all()
                     )
 
