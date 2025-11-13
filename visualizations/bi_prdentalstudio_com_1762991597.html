@@ -1,0 +1,750 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Intelligence - Kaori Ema</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f7fa;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .card h3 {
+            color: #764ba2;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #555;
+        }
+        .info-value {
+            color: #333;
+            text-align: right;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 2px;
+        }
+        .badge-primary {
+            background: #667eea;
+            color: white;
+        }
+        .badge-success {
+            background: #10b981;
+            color: white;
+        }
+        .badge-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        .keyword-tag {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 4px;
+            font-size: 0.9em;
+        }
+        .content-preview {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .highlight {
+            background: #fef3c7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        .source-link {
+            color: #667eea;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .source-link:hover {
+            text-decoration: underline;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        .digest-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Business Intelligence Report</h1>
+        <p><strong>Lead:</strong> Kaori Ema</p>
+        <p><strong>Company:</strong> Printers Row Dental Studio</p>
+        <p><strong>Generated:</strong> 2025-11-12 17:53:17</p>
+    </div>
+    
+    <div class="grid">
+        <!-- Lead Profile Card -->
+        <div class="card">
+            <h2>👤 Lead Profile</h2>
+            <div class="info-row">
+                <span class="info-label">Name:</span>
+                <span class="info-value">Kaori Ema</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Title:</span>
+                <span class="info-value">Dentist/Business Owner</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Company:</span>
+                <span class="info-value">Printers Row Dental Studio</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Industry:</span>
+                <span class="info-value">dentist</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Location:</span>
+                <span class="info-value">Chicago</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Domain:</span>
+                <span class="info-value">prdentalstudio.com</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">smile@prdentalstudio.com</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Score:</span>
+                <span class="info-value">0.60</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Confidence:</span>
+                <span class="info-value">0.70</span>
+            </div>
+            <div style="margin-top: 15px;"><strong>Tags:</strong><br><span class="badge badge-primary">apollo_contact</span><span class="badge badge-primary">apollo_workflow</span></div>
+        </div>
+        
+        <!-- Online Presence Card -->
+        <div class="card">
+            <h2>🌐 Online Presence</h2>
+            <div class="info-row"><span class="info-label">Domain:</span><span class="info-value">prdentalstudio.com</span></div>
+            <div class="info-row"><span class="info-label">LinkedIn:</span><span class="info-value"><a href="http://www.linkedin.com/in/kaori-ema" class="source-link" target="_blank">http://www.linkedin.com/in/kaori-ema</a></span></div>
+            
+            
+        </div>
+        
+        <!-- Hunter Enrichment Card -->
+        <div class="card">
+            <h2>🔍 Email Verification (Hunter.io)</h2>
+    
+            <h3>Domain Search</h3>
+            <div class="info-row">
+                <span class="info-label">Organization:</span>
+                <span class="info-value">PR Dental Studio</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Country:</span>
+                <span class="info-value">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">State:</span>
+                <span class="info-value">N/A</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Disposable:</span>
+                <span class="info-value">No</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Webmail:</span>
+                <span class="info-value">No</span>
+            </div>
+        <h3>Found Emails</h3>
+                <div class="content-preview">
+                    <strong>Email:</strong> smile@prdentalstudio.com<br>
+                    <strong>Type:</strong> generic<br>
+                    <strong>Confidence:</strong> 60%
+                </div>
+                </div>
+        <div class="card">
+            <h2>🔑 Keyword Signals</h2>
+            <div class="stat-box">
+                <div class="stat-value">155</div>
+                <div class="stat-label">Unique Tokens</div>
+            </div>
+            <h3>Top Keywords</h3>
+            <span class="keyword-tag">smile</span><span class="keyword-tag">with</span><span class="keyword-tag">your</span><span class="keyword-tag">appointment</span><span class="keyword-tag">patient</span><span class="keyword-tag">schedule</span><span class="keyword-tag">veneers</span><span class="keyword-tag">chicago</span><span class="keyword-tag">connect</span><span class="keyword-tag">printers</span>
+        </div>
+        
+        <div class="card full-width">
+            <h2>📝 Content Summaries</h2>
+        
+            <h3>Services</h3>
+            <div class="content-preview">The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+schedule appointment
+General Dentistry
+Keep your smile for life with preventative and comprehensive treatments.
+Prophylaxis (Teeth Cleaning)
+Fluoride Treatments
+digital X-Rays
+Oral Cancer Screening
+Occlusal Exam
+Dental Emergencies
+Tooth Colored Fillings
+Dental Sealants
+Root Canal Therapy
+Periodontal Care
+Sedation Dentistry
+Tooth Extractions
+Wisdom Tooth Removal
+Nightguards for Grinding
+Mouthguards
+TMJ Treatment
+Sleep Apnea Solutions
+Laser Dentistry
+In-office 3D Printing
+Cosmetic &amp; Restorative Solutions
+Save and transform your smile with handcrafted treatment options.
+InvisalignÂ® Orthodontic Solutions
+Dental Implants
+Implant-supported Dentures
+Snap-On Smiles
+VITA EasyshadeÂ® for Tooth Color Matching
+Porcelain Veneers
+KOR in-office Whitening
+Specialty technology
+Take-home Teeth Whitening
+Composite Bonding
+Gum Contouring
+Bone &amp; Sinus Grafting
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+Dental Implants
+schedule appointment
+When it comes to replacing missing teeth, you have many replacement options. Dental implants are a </div>
+                
+            <h3>General</h3>
+            <div class="content-preview">The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+with your Chicago Dentist
+schedule appointment
+Relax as we help you look, feel, and be your best.
+the printers row difference
+the guest experience
+patient experience
+As a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.
+Meet Your Smile Artist
+Comprehensive. Cosmetic. Restorative.
+Unmatched smile solutions for the windy city.
+SMILE SERVICES
+smile gallery
+Want a new smile?
+After a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.
+chicago veneers
+âA wonderful experienceâ
+A wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister&#x27;s wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!
+patient reviews
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+with your </div>
+                </div>
+        <div class="card full-width">
+            <h2>✨ Content Highlights</h2>
+        
+            <h3>Services</h3>
+            <ul>
+                <li><span class="highlight">Weâll be in touch soon.</span></li>
+            </ul>
+                
+            <h3>General</h3>
+            <ul>
+                <li><span class="highlight">the printers row difference
+the guest experience
+patient experience
+As a Master in the Academy of General Dentistry, Dr.</span></li><li><span class="highlight">Ema is in the top 2% of dentists.</span></li><li><span class="highlight">Meet Your Smile Artist
+Comprehensive.</span></li>
+            </ul>
+                </div>
+        <div class="card full-width">
+            <h2>🔗 Content Sources (6 pages scraped)</h2>
+        
+            <h3>Services (3 pages)</h3>
+                
+            <div class="content-preview">
+                <strong><a href="https://www.prdentalstudio.com/dental-services" class="source-link" target="_blank">Cosmetic Family Dentist Chicago, IL | Printers Row Dental</a></strong><br>
+                <small>https://www.prdentalstudio.com/dental-services</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+schedule appointment
+General Dentistry
+Keep your smile for life with preventative and comprehensive treatments.
+Prophylaxis (Teeth Cleaning)
+Fluoride Treatments
+digital X-Rays
+Oral Cancer Screening
+Occlusal Exam
+Dental Emergencies
+Tooth Colored Fillings
+Dental Sealants
+Root Canal Therapy
+Periodontal Care
+Sedation Dentistry
+Tooth Extractions
+Wisdom Tooth Removal
+Nightguards for Grinding
+Mouthguards
+TMJ Treatment
+Sleep Apnea Solutions
+Laser Dentistry
+In-office 3D Printing
+Cosmetic &amp; Restorative Solutions
+Save and transform your smile with handcrafted treatment options.
+InvisalignÂ® Orthodontic Solutions
+Dental Implants
+Implant-supported Dentures
+Snap-On Smiles
+VITA EasyshadeÂ® for Tooth Color Matching
+Porcelain Veneers
+KOR in-office Whitening
+Specialty technology
+Take-home Teeth Whitening
+Composite Bonding
+Gum Contouring
+Bone &amp; Sinus Grafting
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    
+            <div class="content-preview">
+                <strong><a href="https://www.prdentalstudio.com/dental-services/dental-implants" class="source-link" target="_blank">Dental Implants | PR Dental Studio</a></strong><br>
+                <small>https://www.prdentalstudio.com/dental-services/dental-implants</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+Dental Implants
+schedule appointment
+When it comes to replacing missing teeth, you have many replacement options. Dental implants are a long-term solution to replacing missing teeth, supporting your existing oral structures, and giving you back your freedom to live your life on your terms. When choosing an oral surgeon, it is imperative that you choose someone you trust. At Printers Row Dental Studio, Dr. Ema is highly-trained and experienced and is committed to providing unparalleled patient care, placing the best dental implants Chicago has to offer.
+There are a number of reasons why you may need implants. If youâre looking for a trusted Chicago dentist, youâve come to the right place. Dr. Ema understands that dental implant surgery can be a great source of anxiety for many people, and she is proud to offer in-office amenities and sedation to make your experience as comfortable and painless as possible.
+Why Replacing Teeth is Important
+Replacing missing teeth is not a solely cosmetic concern. There are a number of side effects that you can experience if you donât close the gap left by missing teeth, including:
+Changes to the shape of your face
+More susceptible to tooth decay and gum disease
+Changes to your bite because the surrounding teeth may start to shift
+If youâre missing even one tooth, it is very important to explore your replacement option in order to preserve your long-term oral health.
+What are Dental Implants
+All on 4 Before
+All on 4 After
+Implants are posts that Dr. Ema surgically implants into your jawbone to act as a replacement for the root of your tooth. After the dental implant fuses to your jawbone, Dr. Ema will place a crown on top of the implant that will look and feel like a natural tooth.
+By replacing a missing tooth with aÂ
+dental implant
+, Dr. Ema helps preserve your jawbone and, in turn, the overall structure of your face.Â One of the most effective and least invasive implants we offer at Printers Row Dental Studio is theÂ
+All-On 4 treatment
+Benefits of Implants
+Dental implants are designed to look, feel, and function like natural teeth
+Since the dental implant fuses with your bone, the discomfort of dentures is not a problem
+With proper care, dental implants will last many years, and, in some cases, they can last the rest of your life
+Dental Implants prevent further bone loss and help retain the shape and appearance of your face
+They are permanent and stable
+Number of Sessions
+Dental implants are applied in three sessions on average. In the first session, a patientâs measurements are taken to create an implant that is perfectly matched to the patientâs jaw so that it fits well and will stay securely in place.
+During the next two appointments, multiple sections of the implant are installed. This process happens in separate sessions to make sure each piece of the implant is securely in place before the next piece is added on.
+Without a session dedicated to measurement, any implant inserted into the jaw will not fit correctly, coming loose or feeling very painful when being used to bite or chew food.
+Â Pausing in between treatments also allows the patients to heal before the next procedure so that there is no unnecessary damage done or pain caused.
+What Should I Expect?
+Dental implant surgery includes the placement of the implants and the placement of the crowns over the implants. Dr. Ema will surgically place the posts into your jawbone, where it will fuse with the bone itself, supporting the surrounding bone structure. Once this process is complete, Dr. Ema will attach abutments to the posts. These abutments will hold your permanent crowns.
+To learn more about the dental implants we offer, visit our
+Â implants page on our Chicago Veneers site
+We understand that surgery can be a frightening prospect for some, and at Printers Row Dental Studio, it is our goal to make your experience as stress-free as possible by providing you with our best care. We are here for anything you may need before, during, and after your surgery. Dr. Ema is specially trained to give you the highest quality of care and comfort.
+If you need to replace missing teeth, donât wait any longerâimplants may be right for you!
+For dental implants Chicago can trust, call our office today atÂ
+(312) 435-0411
+Â to schedule your appointment or
+Â request one online
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    
+            <div class="content-preview">
+                <strong><a href="https://www.prdentalstudio.com/dental-services/dentures" class="source-link" target="_blank"></a></strong><br>
+                <small>https://www.prdentalstudio.com/dental-services/dentures</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+schedule appointment
+Dentures are a great option for replacing missing teeth. They can replace anywhere from few to all of your teeth, and can be supported by no teeth, limited teeth, or implants. With our digital denture process and fully supported prostheses, Printers Row Dental Studio offers the latest techniques in denture services. Weâll give you dentures you can wear with confidence!
+At Printers Row Dental Studio, we are dedicated to transforming your smile into something youâre proud to show off!
+We offer many cosmetic treatments! Printers Row Dental Studio and Chicago Veneers will give you a smile youâll be proud of! Visit our
+Chicago Veneers website
+to learn more about our cosmetic dentistry practice.
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    
+            <h3>General (3 pages)</h3>
+                
+            <div class="content-preview">
+                <strong><a href="https://prdentalstudio.com" class="source-link" target="_blank">Dentist in Chicago, IL | Printers Row Dental Studio</a></strong><br>
+                <small>https://prdentalstudio.com</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+with your Chicago Dentist
+schedule appointment
+Relax as we help you look, feel, and be your best.
+the printers row difference
+the guest experience
+patient experience
+As a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.
+Meet Your Smile Artist
+Comprehensive. Cosmetic. Restorative.
+Unmatched smile solutions for the windy city.
+SMILE SERVICES
+smile gallery
+Want a new smile?
+After a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.
+chicago veneers
+âA wonderful experienceâ
+A wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister&#x27;s wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!
+patient reviews
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    
+            <div class="content-preview">
+                <strong><a href="https://www.prdentalstudio.com" class="source-link" target="_blank">Dentist in Chicago, IL | Printers Row Dental Studio</a></strong><br>
+                <small>https://www.prdentalstudio.com</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+World Class Smile Care
+with your Chicago Dentist
+schedule appointment
+Relax as we help you look, feel, and be your best.
+the printers row difference
+the guest experience
+patient experience
+As a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists.
+Meet Your Smile Artist
+Comprehensive. Cosmetic. Restorative.
+Unmatched smile solutions for the windy city.
+SMILE SERVICES
+smile gallery
+Want a new smile?
+After a few short visits with Dr. Ema, youâll experience a perfectly aligned, stunningly beautiful smile with the magic of veneers.
+chicago veneers
+âA wonderful experienceâ
+A wonderful experience from start to finish! I went to see Dr Kaori Ema for a teeth whitening session before my sister&#x27;s wedding so I could look wedding day photo ready! I was there for about an hour or so and was super happy with the results. The before and after photos were so easy to see the change in my teeth. Thank you for making me feel my best!
+patient reviews
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    
+            <div class="content-preview">
+                <strong><a href="https://www.prdentalstudio.com/difference" class="source-link" target="_blank">Best patient experience in Chicago, IL | Printers Row Dental Studio</a></strong><br>
+                <small>https://www.prdentalstudio.com/difference</small><br>
+                <p>The Printers Row Difference
+Patient Center
+Meet Your Smile Artist
+Smile Services
+Smile Gallery
+Chicago Veneers
+Patient Reviews
+connect with us
+schedule an appointment
+The Printers Row Difference
+schedule appointment
+The Difference
+A bit of luxury
+Like a five-star hotel, you can expect the unexpected with luxurious amenities including Netflix, warm blankets, eye mask, neck pillow, headphones, lavender aromatherapy and sedation options to keep you comfortable.
+A heart for relationships
+Driven by a desire to build lifelong friendships with our patients, we always take our time to listen closely to you and your story.
+A smile artist with world class skill
+As a Master in the Academy of General Dentistry, Dr. Ema is in the top 2% of dentists. Add to that, her teaching experience, AEGD residency, and over 2000 hours of continuing education, and you get stunning smile transformations and unrivaled dental expertise.
+keep you in charge
+Weâll diagnose, offer a full menu of solutions, and answer all your questions â but you always get to choose the care you want without any pressure from us.
+modern technology
+To make your care easier, faster, and more effective, we use leading-edge technology like digital x-rays, 2D and 3D radiography, high-definition photography, gunk-free digital impressions, diode lasers, a digital spectrophotometer for color matching, and more.
+âOVERWHELMED with love, charm, &amp; joy!â
+Anytime you have to visit the dentist, there can be some anxiety. However, anytime I enter Printer&#x27;s Row Dentall Studio, I am OVERWHELMED with love, charm, and joy! The team is exceptionally hospitable and Dr. Ema is not only one of the most high quality profressionals I&#x27;ve ever had the pleasure to meet, she makes me feel comfortable and safe in her care!
+patient reviews
+CONNECT WITH US
+312.435.0411
+or request an appointment online to set up your first visit. Weâll be in touch soon.
+schedule appointment
+location &amp; hours</p>
+            </div>
+                    </div>
+        <div class="card full-width">
+            <h2>📋 Metadata Insights</h2>
+        
+            <h3>Apollo Contact</h3>
+            <div class="content-preview">
+                <pre style="white-space: pre-wrap; font-family: inherit;">{
+  &quot;title&quot;: &quot;Dentist/Business Owner&quot;,
+  &quot;organization_name&quot;: &quot;Printers Row Dental Studio&quot;,
+  &quot;organization_id&quot;: &quot;5b8603f8f874f70155b20b62&quot;,
+  &quot;city&quot;: &quot;Chicago&quot;,
+  &quot;state&quot;: &quot;Illinois&quot;,
+  &quot;country&quot;: &quot;United States&quot;,
+  &quot;headline&quot;: &quot;Doctor of Dental Surgery; Master of the Academy of General Dentistry; Cosmetic Dentist and Practice Owner&quot;,
+  &quot;time_zone&quot;: &quot;America/Chicago&quot;,
+  &quot;contact_stage_id&quot;: &quot;69114334a5dfc000118df0d8&quot;,
+  &quot;owner_id&quot;: &quot;6911433aa5dfc000118df38c&quot;,
+  &quot;contact_emails&quot;: [
+    {
+      &quot;email&quot;: &quot;smile@prdentalstudio.com&quot;,
+      &quot;status&quot;: &quot;verified&quot;,
+      &quot;source&quot;: &quot;User Managed&quot;,
+      &quot;confidence&quot;: null
+    }
+  ],
+  &quot;phone_numbers&quot;: [
+    {
+      &quot;number&quot;: &quot;+1 312-435-0411&quot;,
+      &quot;type&quot;: &quot;work_hq&quot;,
+      &quot;status&quot;: &quot;no_status&quot;
+    }
+  ]
+}</pre>
+            </div>
+                
+            <h3>Apollo Workflow Stats</h3>
+            <div class="content-preview">
+                <pre style="white-space: pre-wrap; font-family: inherit;">{
+  &quot;people_found&quot;: 29,
+  &quot;existing_contacts&quot;: 0,
+  &quot;new_people&quot;: 29,
+  &quot;enriched&quot;: 18,
+  &quot;created&quot;: 18,
+  &quot;duration_seconds&quot;: 3.086738
+}</pre>
+            </div>
+                </div>
+        <div class="card full-width">
+            <h2>🤖 AI-Generated Digest</h2>
+            <div class="digest-box">Lead Name: Kaori Ema
+Title: Dentist/Business Owner
+Company: Printers Row Dental Studio
+Industry: dentist
+Location: Chicago
+Hunter Organization: PR Dental Studio
+Hunter Verified Emails: 1 records
+Top Keywords: smile, with, your, appointment, patient, schedule, veneers
+Service Highlights:
+- Weâll be in touch soon.
+Apollo Contact Emails:
+- smile@prdentalstudio.com (verified)</div>
+        </div>
+        
+        <div class="card full-width">
+            <h2>📊 Intelligence Summary</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Content Types</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">6</div>
+                    <div class="stat-label">Pages Scraped</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">10</div>
+                    <div class="stat-label">Top Keywords</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">✅</div>
+                    <div class="stat-label">Email Verified</div>
+                </div>
+            </div>
+        </div>
+    
+    </div>
+</body>
+</html>

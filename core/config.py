@@ -63,6 +63,9 @@ class AppConfig:
     browser_screenshot_dir: Optional[str] = None  # Defaults to ./data/screenshots
     browser_headless: bool = True  # Run browser in headless mode
     browser_openai_model: str = "gpt-4o-mini"  # OpenAI model for BrowserUse agent
+
+    # Database Configuration
+    database_url: Optional[str] = None  # Railway Postgres DATABASE_URL
     
     @classmethod
     def from_env(cls) -> AppConfig:
@@ -95,7 +98,7 @@ class AppConfig:
         
         return cls(
             # ElevenLabs - API key from Doppler, others from .env
-            elevenlabs_api_key=get_elevenlabs_api_key(),
+            elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
             elevenlabs_agent_id=os.getenv("ELEVENLABS_AGENT_ID"),
             elevenlabs_voice_id=os.getenv("ELEVENLABS_VOICE_ID"),
             elevenlabs_mcp_server_id=os.getenv("ELEVENLABS_MCP_SERVER_ID"),
@@ -130,6 +133,9 @@ class AppConfig:
             browser_screenshot_dir=os.getenv("BROWSER_SCREENSHOT_DIR"),
             browser_headless=os.getenv("BROWSER_HEADLESS", "true").lower() == "true",
             browser_openai_model=os.getenv("BROWSER_OPENAI_MODEL", "gpt-4o-mini"),
+
+            # Database
+            database_url=os.getenv("DATABASE_URL"),
         )
     
     def is_railway(self) -> bool:

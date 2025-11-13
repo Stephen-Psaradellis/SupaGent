@@ -870,10 +870,88 @@ async def get_business_profile(
         Complete business profile and intelligence summary
     """
     try:
-        import json
         from pathlib import Path
+        from core.database import get_db_session
+        from core.models import BusinessDomain, IntelligenceBundle
 
-        # Load business data
+        # Try to load from database first
+        with get_db_session() as session:
+            business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
+
+            if business_domain and business_domain.intelligence_bundles:
+                # Use the most recent intelligence bundle
+                latest_bundle = max(business_domain.intelligence_bundles,
+                                  key=lambda b: b.generated_at)
+
+                # Summarize content by type from scraped content
+                summaries = {}
+                content_counts = {}
+                for scraped in business_domain.scraped_contents:
+                    content_type = scraped.content_type
+                    if content_type not in summaries:
+                        summaries[content_type] = []
+                        content_counts[content_type] = 0
+
+                    if len(summaries[content_type]) < 3:  # Limit to 3 items per type
+                        summaries[content_type].append(scraped.content[:200])
+                    content_counts[content_type] += 1
+
+                # Combine summaries
+                for content_type in summaries:
+                    if summaries[content_type]:
+                        summaries[content_type] = " ".join(summaries[content_type])[:500]
+
+                # Build profile from intelligence bundle
+                lead_profile = latest_bundle.lead_profile or {}
+                profile = f"""
+BUSINESS PROFILE: {domain}
+
+COMPANY INFORMATION:
+- Name: {lead_profile.get('name', 'Unknown')}
+- Industry: {lead_profile.get('industry', 'Unknown')}
+- Location: {lead_profile.get('location', 'Unknown')}
+- Email: {lead_profile.get('primary_email', 'Not found')}
+- Source: {lead_profile.get('source', 'Unknown')}
+
+SERVICES: {summaries.get('services', 'Not available')}
+
+ABOUT: {summaries.get('about', 'Not available')}
+
+TEAM: {summaries.get('team', 'Not available')}
+
+BLOG/CONTENT: {summaries.get('blog', 'Not available')}
+
+"""
+
+                # Add agent info if available
+                agent_file = Path("pipeline/agents") / domain.replace(".", "_") / "agent_request.json"
+                if agent_file.exists():
+                    import json
+                    with open(agent_file, 'r', encoding='utf-8') as f:
+                        agent_data = json.load(f)
+                        agent_section = agent_data.get("conversation_config", {}).get("agent", {})
+                        prompt_section = agent_section.get("prompt", {})
+                        profile += f"""
+Voice Agent Payload:
+- Name: {agent_data.get('name', 'Not configured')}
+- First Message: {agent_section.get('first_message', 'Not configured')}
+- Language: {agent_section.get('language', 'en-US')}
+- Prompt Preview: {prompt_section.get('prompt', '')[:240]}...
+"""
+
+                profile += f"""
+
+INTELLIGENCE SUMMARY:
+- Content Types Available: {', '.join(content_counts.keys())}
+- Total Content Items: {sum(content_counts.values())}
+- Agent Configured: {'Yes' if agent_file.exists() else 'No'}
+- Intelligence Generated: {latest_bundle.generated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}
+"""
+
+                return profile.strip()
+
+        # Fallback to file-based approach if no database data
+        import json
         data_dir = Path("pipeline/business_data") / domain.replace(".", "_")
         content_file = data_dir / "content.json"
 

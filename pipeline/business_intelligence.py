@@ -23,6 +23,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse
@@ -34,6 +35,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from memory.vector_store import VectorStore
 from pipeline.lead_generation import Lead, slugify
+
+# Database imports
+from core.database import get_db_session
+from core.models import BusinessDomain, ScrapedContent, IntelligenceBundle, HunterEnrichment
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -185,41 +190,65 @@ class BusinessIntelligenceLoader:
         """
         logger.info(f"🔍 Loading business intelligence for {domain}")
 
-        # Create domain-specific directory
-        domain_dir = self.data_dir / domain.replace(".", "_")
-        domain_dir.mkdir(parents=True, exist_ok=True)
+        # Try database first, fallback to file storage
+        try:
+            with get_db_session() as session:
+                # Check if domain exists and has content
+                business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
 
-        # Check if already processed
-        content_file = domain_dir / "content.json"
-        if content_file.exists():
-            logger.info(f"📁 Loading cached content for {domain}")
-            try:
-                with open(content_file, 'r', encoding='utf-8') as f:
-                    content_data = json.load(f)
-                    return {
-                        content_type: [ScrapedContent(**item) for item in items]
-                        for content_type, items in content_data.items()
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to load cached content: {e}")
+            if business_domain and business_domain.scraped_contents:
+                logger.info(f"📁 Loading cached content for {domain} from database")
+                # Load from database
+                categorized_content = {}
+                for scraped in business_domain.scraped_contents:
+                    content_type = scraped.content_type
+                    if content_type not in categorized_content:
+                        categorized_content[content_type] = []
 
-        # Scrape fresh content
-        content = self._scrape_website(f"https://{domain}", max_pages)
+                    scraped_obj = ScrapedContent(
+                        url=scraped.url,
+                        title=scraped.title,
+                        content=scraped.content,
+                        content_type=scraped.content_type,
+                        metadata=scraped.metadata_json or {}
+                    )
+                    categorized_content[content_type].append(scraped_obj)
 
-        # Categorize content
-        categorized_content = self._categorize_content(content)
+                return categorized_content
+            else:
+                # Scrape fresh content
+                content = self._scrape_website(f"https://{domain}", max_pages)
 
-        # Save to disk
-        content_dict = {
-            content_type: [item.to_dict() for item in items]
-            for content_type, items in categorized_content.items()
-        }
+                # Categorize content
+                categorized_content = self._categorize_content(content)
 
-        with open(content_file, 'w', encoding='utf-8') as f:
-            json.dump(content_dict, f, indent=2, ensure_ascii=False)
+                # Save to database
+                if not business_domain:
+                    business_domain = BusinessDomain(domain=domain)
+                    session.add(business_domain)
+                    session.flush()  # Get the ID
 
-        logger.info(f"💾 Saved {sum(len(items) for items in categorized_content.values())} pages for {domain}")
-        return categorized_content
+                # Save scraped content
+                for content_type, items in categorized_content.items():
+                    for item in items:
+                        scraped_db = ScrapedContent(
+                            domain_id=business_domain.id,
+                            url=item.url,
+                            title=item.title,
+                            content=item.content,
+                            content_type=item.content_type,
+                            metadata_json=item.metadata,
+                            scraped_at=datetime.fromtimestamp(item.metadata.get("scraped_at", time.time()))
+                        )
+                        session.add(scraped_db)
+
+                logger.info(f"💾 Saved {sum(len(items) for items in categorized_content.values())} pages for {domain} to database")
+                return categorized_content
+
+        except Exception as exc:
+            logger.warning(f"Database not available, falling back to file storage: {exc}")
+            # Fallback to file-based storage
+            return self._load_business_data_fallback(domain, max_pages)
 
     def _scrape_website(self, base_url: str, max_pages: int) -> List[ScrapedContent]:
         """Scrape website content with intelligent crawling.
@@ -755,42 +784,139 @@ class BusinessIntelligenceLoader:
             return {}
 
         enrichment: Dict[str, Any] = {}
-        domain_data = self.hunter_client.domain_search(domain)
-        if domain_data:
-            enrichment["domain_search"] = {
-                "organization": domain_data.get("organization"),
-                "country": domain_data.get("country"),
-                "state": domain_data.get("state"),
-                "emails": [
-                    {
-                        "value": email.get("value"),
-                        "type": email.get("type"),
-                        "position": email.get("position"),
-                        "confidence": email.get("confidence"),
-                        "first_name": email.get("first_name"),
-                        "last_name": email.get("last_name"),
-                    }
-                    for email in (domain_data.get("emails") or [])[:5]
-                ],
-                "pattern": domain_data.get("pattern"),
-                "disposable": domain_data.get("disposable"),
-                "webmail": domain_data.get("webmail"),
-            }
 
-        first_name, last_name = self._split_name(lead.name)
-        if first_name and last_name:
-            finder_data = self.hunter_client.email_finder(
-                domain=domain,
-                first_name=first_name,
-                last_name=last_name,
-                company=company,
-            )
-            if finder_data:
-                enrichment["email_finder"] = {
-                    "email": finder_data.get("email"),
-                    "score": finder_data.get("score"),
-                    "verified": finder_data.get("verification", {}).get("status"),
+        try:
+            with get_db_session() as session:
+                # Get or create business domain
+                business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
+                if not business_domain:
+                    business_domain = BusinessDomain(domain=domain)
+                    session.add(business_domain)
+                    session.flush()
+
+                # Check for existing domain search data
+                existing_domain_search = session.query(HunterEnrichment).filter_by(
+                    domain_id=business_domain.id,
+                    enrichment_type="domain_search"
+                ).first()
+
+                if existing_domain_search:
+                    # Load from database
+                    domain_data = existing_domain_search.domain_search_data
+                    if domain_data:
+                        enrichment["domain_search"] = domain_data
+                else:
+                    # Fetch from Hunter.io
+                    domain_data = self.hunter_client.domain_search(domain)
+                    if domain_data:
+                        enrichment["domain_search"] = {
+                            "organization": domain_data.get("organization"),
+                            "country": domain_data.get("country"),
+                            "state": domain_data.get("state"),
+                            "emails": [
+                                {
+                                    "value": email.get("value"),
+                                    "type": email.get("type"),
+                                    "position": email.get("position"),
+                                    "confidence": email.get("confidence"),
+                                    "first_name": email.get("first_name"),
+                                    "last_name": email.get("last_name"),
+                                }
+                                for email in (domain_data.get("emails") or [])[:5]
+                            ],
+                            "pattern": domain_data.get("pattern"),
+                            "disposable": domain_data.get("disposable"),
+                            "webmail": domain_data.get("webmail"),
+                        }
+
+                        # Save to database
+                        hunter_enrichment = HunterEnrichment(
+                            domain_id=business_domain.id,
+                            enrichment_type="domain_search",
+                            domain_search_data=enrichment["domain_search"]
+                        )
+                        session.add(hunter_enrichment)
+
+                # Email finder enrichment
+                first_name, last_name = self._split_name(lead.name)
+                if first_name and last_name:
+                    # Check for existing email finder data
+                    target_email = f"{first_name.lower()}.{last_name.lower()}@{domain}"
+                    existing_finder = session.query(HunterEnrichment).filter_by(
+                        domain_id=business_domain.id,
+                        enrichment_type="email_finder",
+                        target_email=target_email
+                    ).first()
+
+                    if existing_finder:
+                        # Load from database
+                        finder_data = existing_finder.email_finder_data
+                        if finder_data:
+                            enrichment["email_finder"] = finder_data
+                    else:
+                        # Fetch from Hunter.io
+                        finder_data = self.hunter_client.email_finder(
+                            domain=domain,
+                            first_name=first_name,
+                            last_name=last_name,
+                            company=company,
+                        )
+                        if finder_data:
+                            enrichment["email_finder"] = {
+                                "email": finder_data.get("email"),
+                                "score": finder_data.get("score"),
+                                "verified": finder_data.get("verification", {}).get("status"),
+                            }
+
+                            # Save to database
+                            hunter_enrichment = HunterEnrichment(
+                                domain_id=business_domain.id,
+                                enrichment_type="email_finder",
+                                email_finder_data=enrichment["email_finder"],
+                                target_email=target_email,
+                                target_first_name=first_name,
+                                target_last_name=last_name
+                            )
+                            session.add(hunter_enrichment)
+
+        except Exception as exc:
+            logger.warning("Failed to use database for Hunter enrichment, falling back to in-memory: %s", exc)
+            # Fallback to original logic if database fails
+            domain_data = self.hunter_client.domain_search(domain)
+            if domain_data:
+                enrichment["domain_search"] = {
+                    "organization": domain_data.get("organization"),
+                    "country": domain_data.get("country"),
+                    "state": domain_data.get("state"),
+                    "emails": [
+                        {
+                            "value": email.get("value"),
+                            "type": email.get("type"),
+                            "position": email.get("position"),
+                            "confidence": email.get("confidence"),
+                            "first_name": email.get("first_name"),
+                            "last_name": email.get("last_name"),
+                        }
+                        for email in (domain_data.get("emails") or [])[:5]
+                    ],
+                    "pattern": domain_data.get("pattern"),
+                    "disposable": domain_data.get("disposable"),
+                    "webmail": domain_data.get("webmail"),
                 }
+
+            if first_name and last_name:
+                finder_data = self.hunter_client.email_finder(
+                    domain=domain,
+                    first_name=first_name,
+                    last_name=last_name,
+                    company=company,
+                )
+                if finder_data:
+                    enrichment["email_finder"] = {
+                        "email": finder_data.get("email"),
+                        "score": finder_data.get("score"),
+                        "verified": finder_data.get("verification", {}).get("status"),
+                    }
 
         return enrichment
 
@@ -806,12 +932,99 @@ class BusinessIntelligenceLoader:
         return parts[0], parts[-1]
 
     def _persist_intelligence(self, directory: Path, intelligence: Dict[str, Any]) -> None:
-        """Persist the intelligence payload to disk."""
+        """Persist the intelligence payload to database."""
+        try:
+            with get_db_session() as session:
+                # Get or create business domain
+                lead_profile = intelligence.get("lead_profile", {})
+                domain = lead_profile.get("domain")
+                if not domain:
+                    logger.warning("No domain found in intelligence bundle, skipping database persistence")
+                    return
+
+                business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
+                if not business_domain:
+                    business_domain = BusinessDomain(domain=domain)
+                    session.add(business_domain)
+                    session.flush()
+
+                # Create intelligence bundle
+                bundle = IntelligenceBundle(
+                    domain_id=business_domain.id,
+                    lead_name=lead_profile.get("name"),
+                    lead_title=lead_profile.get("title"),
+                    lead_company=lead_profile.get("company"),
+                    lead_industry=lead_profile.get("industry"),
+                    lead_location=lead_profile.get("location"),
+                    lead_email=lead_profile.get("primary_email"),
+                    lead_phone=lead_profile.get("phone"),
+                    lead_score=str(lead_profile.get("score", 0)),
+                    lead_source=lead_profile.get("source"),
+                    lead_profile=lead_profile,
+                    metadata_insights=intelligence.get("metadata_insights"),
+                    hunter_enrichment=intelligence.get("hunter_enrichment"),
+                    content_summaries=intelligence.get("content_summaries"),
+                    content_highlights=intelligence.get("content_highlights"),
+                    keyword_signals=intelligence.get("keyword_signals"),
+                    online_presence=intelligence.get("online_presence"),
+                    llm_digest=intelligence.get("llm_digest"),
+                    content_sources=intelligence.get("content_sources"),
+                    generated_at=datetime.fromtimestamp(intelligence.get("generated_at", time.time()))
+                )
+
+                session.add(bundle)
+                logger.info("💾 Stored intelligence bundle for domain %s in database", domain)
+
+        except Exception as exc:
+            logger.error("Failed to persist intelligence to database: %s", exc)
+            # Fallback to file storage if database fails
+            self._persist_intelligence_fallback(directory, intelligence)
+
+    def _load_business_data_fallback(self, domain: str, max_pages: int) -> Dict[str, List[ScrapedContent]]:
+        """Fallback method to load business data from files when database is unavailable."""
+        # Create domain-specific directory
+        domain_dir = self.data_dir / domain.replace(".", "_")
+        domain_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check if already processed
+        content_file = domain_dir / "content.json"
+        if content_file.exists():
+            logger.info(f"📁 Loading cached content for {domain} from files")
+            try:
+                with open(content_file, 'r', encoding='utf-8') as f:
+                    content_data = json.load(f)
+                    return {
+                        content_type: [ScrapedContent(**item) for item in items]
+                        for content_type, items in content_data.items()
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to load cached content: {e}")
+
+        # Scrape fresh content
+        content = self._scrape_website(f"https://{domain}", max_pages)
+
+        # Categorize content
+        categorized_content = self._categorize_content(content)
+
+        # Save to disk
+        content_dict = {
+            content_type: [item.to_dict() for item in items]
+            for content_type, items in categorized_content.items()
+        }
+
+        with open(content_file, 'w', encoding='utf-8') as f:
+            json.dump(content_dict, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"💾 Saved {sum(len(items) for items in categorized_content.values())} pages for {domain} to files")
+        return categorized_content
+
+    def _persist_intelligence_fallback(self, directory: Path, intelligence: Dict[str, Any]) -> None:
+        """Fallback method to persist intelligence to disk when database is unavailable."""
         output_file = directory / "intelligence.json"
         try:
             with open(output_file, "w", encoding="utf-8") as handle:
                 json.dump(intelligence, handle, indent=2, ensure_ascii=False)
-            logger.info("💾 Stored intelligence bundle at %s", output_file)
+            logger.info("💾 Stored intelligence bundle at %s (fallback)", output_file)
         except OSError as exc:
             logger.error("Failed to write intelligence file %s: %s", output_file, exc)
 

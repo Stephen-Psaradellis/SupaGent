@@ -130,13 +130,14 @@ class EmailSender:
 
         return config
 
-    def send_email_to_lead(self, lead: Lead, track_status: bool = True, use_personalized_html: bool = True) -> bool:
+    def send_email_to_lead(self, lead: Lead, track_status: bool = True, use_personalized_html: bool = True, voice_agent_id: Optional[str] = None) -> bool:
         """Send email to a specific lead.
 
         Args:
             lead: Lead object to send email to
             track_status: Whether to track delivery status
             use_personalized_html: Whether to use personalized HTML generation
+            voice_agent_id: ElevenLabs agent ID to embed in the email
 
         Returns:
             True if sent successfully, False otherwise
@@ -168,15 +169,15 @@ class EmailSender:
                     business_content = self._load_business_content(lead.domain)
 
                     # Generate personalized HTML
-                    # Get agent_id from environment variable
-                    voice_agent_id = os.getenv("ELEVENLABS_AGENT_ID")
+                    # Use provided agent_id or fall back to environment variable
+                    agent_id_to_use = voice_agent_id or os.getenv("ELEVENLABS_AGENT_ID")
                     html_content = self.email_composer.compose_personalized_html_email(
                         business_name=lead.name or lead.domain,
                         domain=lead.domain,
                         industry=lead.industry or "general",
                         lead_data=lead_data,
                         business_content=business_content,
-                        voice_agent_id=voice_agent_id
+                        voice_agent_id=agent_id_to_use
                     )
 
                     # Create email data structure for personalized HTML
@@ -324,7 +325,16 @@ class EmailSender:
                 "ReplyTo": os.getenv("REPLY_TO_EMAIL", self.config["from_email"]),
                 "Headers": {
                     "List-Unsubscribe": f"<{unsubscribe_url}>, <mailto:unsubscribe@shortforge.dev?subject=unsubscribe>",
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    # Gmail-specific headers to avoid Promotions categorization
+                    "X-Priority": "3",
+                    "X-MSMail-Priority": "Normal",
+                    "Importance": "Normal",
+                    "X-Auto-Response-Suppress": "OOF",
+                    # Additional headers that may help with Gmail categorization
+                    "X-Campaign-ID": "",  # Empty to avoid bulk campaign detection
+                    "X-Mailer": "Personal Email Client",  # Make it look more personal
+                    "X-Report-Abuse": f"mailto:abuse@shortforge.dev?subject=Report%20Abuse%20-%20{recipient_email}"
                 }
             }
         }

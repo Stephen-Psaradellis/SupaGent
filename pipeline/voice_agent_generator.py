@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_CREATE_AGENT_URL = "https://api.elevenlabs.io/v1/convai/agents/create"
 DEFAULT_VOICE_ID = "j57KDF72L6gxbLk4sOo5"
-DEFAULT_TTS_MODEL_ID = "eleven_turbo_v2_5"
+DEFAULT_TTS_MODEL_ID = "eleven_turbo_v2"
 DEFAULT_AUDIO_FORMAT = "pcm_16000"
 
 
@@ -197,7 +197,7 @@ class VoiceAgentGenerator:
                 f"Hi there! You're speaking with the AI assistant for {business_name}. "
                 "I can help with services, availability, and next steps. How may I support you today?"
             ),
-            "language": "en-US",
+            "language": "en",
             "system_prompt": self._build_fallback_system_prompt(lead_profile, industry),
             "tags": [f"industry:{industry}", "source:voice_agent_pipeline"],
         }
@@ -249,18 +249,17 @@ Remember: Every interaction should reinforce {company}'s expertise, reliability,
         conversation_config = {
             "agent": {
                 "first_message": blueprint["first_message"].strip(),
-                "language": blueprint.get("language", "en-US"),
+                "language": blueprint.get("language", "en").split("-")[0],
                 "prompt": {
                     "prompt": blueprint["system_prompt"],
-                    "llm": "gpt-4o-mini",
-                    "reasoning_effort": "low",
+                    "llm": "gemini-2.5-flash",
                 },
             },
             "tts": {
                 "model_id": DEFAULT_TTS_MODEL_ID,
                 "voice_id": DEFAULT_VOICE_ID,
                 "agent_output_audio_format": DEFAULT_AUDIO_FORMAT,
-                "optimize_streaming_latency": "3",
+                "optimize_streaming_latency": 3,
                 "stability": 0.45,
                 "similarity_boost": 0.3,
             },
@@ -271,10 +270,10 @@ Remember: Every interaction should reinforce {company}'s expertise, reliability,
             },
             "turn": {
                 "turn_timeout": 30,
-                "initial_wait_time": 0.4,
+                "initial_wait_time": 1,
                 "silence_end_call_timeout": 60,
                 "soft_timeout_config": {
-                    "timeout_seconds": 25,
+                    "timeout_seconds": 5,
                     "message": "I'm still here if you need anything else.",
                 },
                 "turn_eagerness": "normal",

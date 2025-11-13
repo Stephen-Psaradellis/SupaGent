@@ -49,7 +49,7 @@ def format_context(docs: List[Dict[str, Any]]) -> str:
     for d in docs:
         meta = d.get("metadata", {})
         title = meta.get("title") or meta.get("source") or "doc"
-        lines.append(f"- ({title}) {d['page_content'][:500]}")
+        lines.append(f"- ({title}) {d['page_content'][:1000]}")
     return "\n".join(lines)
 
 

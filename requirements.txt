@@ -48,6 +48,11 @@ playwright>=1.40.0
 
 # Email sending via ElasticEmail API (uses requests, already included above)
 
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.13.0  # For database migrations
+
 # Development and Testing
 pytest>=7.4.0
 pytest-mock>=3.12.0

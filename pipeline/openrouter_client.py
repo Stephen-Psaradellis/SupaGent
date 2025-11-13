@@ -939,6 +939,7 @@ Generate the email now:"""
         }
 
         try:
+            logger.debug(f"Making OpenRouter API call with model: {model_name}")
             response = self.session.post(
                 f"{self.config.base_url}/chat/completions",
                 json=payload,
@@ -948,6 +949,7 @@ Generate the email now:"""
             if response.status_code == 200:
                 result = response.json()
                 content = result["choices"][0]["message"]["content"]
+                logger.debug(f"OpenRouter API call successful, response length: {len(content)}")
                 return content
             else:
                 logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
@@ -968,6 +970,13 @@ Generate the email now:"""
             Structured email template
         """
         try:
+            # Log the raw response for debugging
+            logger.debug(f"Raw LLM response: {response[:200]}...")
+
+            # Check if response is empty
+            if not response or not response.strip():
+                raise ValueError("Empty response from LLM")
+
             # Try to parse as JSON
             result = json.loads(response.strip())
 
@@ -994,7 +1003,9 @@ Generate the email now:"""
 
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Failed to parse LLM response: {e}")
-            logger.warning(f"Raw response: {response[:500]}...")
+            logger.warning(f"Raw response length: {len(response)} characters")
+            logger.warning(f"Raw response preview: {response[:500]}...")
+            logger.warning("Falling back to template-based email composition")
 
             # Fallback template
             return {

@@ -429,7 +429,7 @@ def visualize_business_intelligence(lead: Lead, intelligence: Optional[Dict[str,
             if summary:
                 html_parts.append(f"""
             <h3>{content_type.title()}</h3>
-            <div class="content-preview">{_escape_html(summary[:500])}{'...' if len(summary) > 500 else ''}</div>
+            <div class="content-preview">{_escape_html(summary)}</div>
                 """)
         html_parts.append("</div>")
     
@@ -461,12 +461,12 @@ def visualize_business_intelligence(lead: Lead, intelligence: Optional[Dict[str,
                 html_parts.append(f"""
             <h3>{content_type.title()} ({len(sources)} pages)</h3>
                 """)
-                for source in sources[:5]:  # Show max 5 per type
+                for source in sources:  # Show max 5 per type
                     html_parts.append(f"""
             <div class="content-preview">
                 <strong><a href="{_escape_html(source.get('url', '#'))}" class="source-link" target="_blank">{_escape_html(source.get('title', 'Untitled'))}</a></strong><br>
                 <small>{_escape_html(source.get('url', ''))}</small><br>
-                <p>{_escape_html(source.get('content', '')[:300])}{'...' if len(source.get('content', '')) > 300 else ''}</p>
+                <p>{_escape_html(source.get('content', ''))}</p>
             </div>
                     """)
         html_parts.append("</div>")
@@ -622,21 +622,27 @@ def run_e2e_outreach_test():
             agents_dir="pipeline/agents",
             use_llm=True
         )
-        
+
         agent_config = agent_generator.generate_agent_for_business(
             domain=lead.domain or lead.email.split('@')[1] if lead.email and '@' in lead.email else "test",
             business_name=lead.name,
             industry=lead.industry or "dentist",
             lead=lead,
             business_intelligence=intelligence,
-            create_elevenlabs=False  # Don't actually create in ElevenLabs for test
+            create_elevenlabs=True  # Actually create the agent in ElevenLabs
         )
-        
+
         if agent_config:
             agent_name = agent_config.request_payload.get("name", lead.name)
+            agent_id = agent_config.agent_id
             logger.info(f"✅ Generated agent configuration: {agent_name}")
+            if agent_id:
+                logger.info(f"✅ Created ElevenLabs agent with ID: {agent_id}")
+            else:
+                logger.warning("   ⚠️ Agent configuration created but ElevenLabs registration failed")
         else:
             logger.warning("   ⚠️ Failed to generate agent configuration")
+            agent_id = None
         
         # Step 4: Compose email
         logger.info("\n📧 Step 4: Composing email...")
@@ -645,9 +651,25 @@ def run_e2e_outreach_test():
             use_llm=True,
             business_data_dir="pipeline/business_data"
         )
-        
-        email_domain = lead.domain or (lead.email.split('@')[1] if lead.email and '@' in lead.email else "test")
-        email_template = email_composer.compose_email_for_lead(email_domain)
+
+        # Try to load business content for personalization
+        content_summary = {}
+        if lead.domain:
+            try:
+                content_summary = email_composer._load_business_content(lead.domain) or {}
+            except Exception:
+                content_summary = {}
+
+        # Compose email using the lead data directly
+        email_template = email_composer.compose_email(
+            business_name=lead.name,
+            domain=lead.domain or "test",
+            industry=lead.industry or "general",
+            recipient_email=lead.email,
+            recipient_name=None,
+            content_summary=content_summary,
+            voice_agent_id=agent_id
+        )
         
         if email_template:
             logger.info(f"✅ Composed email with subject: {email_template.subject}")
@@ -695,7 +717,7 @@ def run_e2e_outreach_test():
         )
         
         # Send the email (will use test_lead.email which is TEST_EMAIL)
-        success = email_sender.send_email_to_lead(test_lead, track_status=False)
+        success = email_sender.send_email_to_lead(test_lead, track_status=False, voice_agent_id=agent_id)
         
         if success:
             logger.info(f"✅ Email sent successfully to {TEST_EMAIL}")

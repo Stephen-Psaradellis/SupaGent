@@ -43,7 +43,7 @@ class EmailTemplate:
     domain: str
     industry: str
     voice_agent_url: Optional[str] = None
-    cta_text: str = "Try Our AI Assistant"
+    cta_text: str = "Try Our AI Assistant - Tailored for Your Business"
     personalization_notes: List[str] = None
 
     def __post_init__(self):
@@ -185,6 +185,48 @@ class HTMLTemplateGenerator:
         """Build the LLM prompt for content personalization."""
         return f"""You are creating personalized marketing content for ShortForge Consultancy's AI Voice Agent demo email.
 
+Voice Agent Toolset:
+    Knowledge Base & Support Tools (6)
+        search_knowledge_base
+            Searches the customer support knowledge base for documentation, FAQs, and troubleshooting guides
+        create_support_ticket
+            Creates a support ticket in the CRM
+        get_customer_info
+            Retrieves customer information from CRM (account details, order history, interactions)
+        escalate_to_human
+            Escalates conversation to a human support agent
+        log_interaction
+            Logs customer interactions in CRM for analytics and compliance
+        check_order_status
+            Checks order status including shipping and estimated delivery
+    Calendar & Appointment Tools (5)
+        check_availability
+            Checks calendar availability for a time range
+        get_user_bookings
+            Gets user's calendar bookings/appointments for a time range
+        book_appointment
+            Creates a new appointment/event in the calendar
+        modify_appointment
+            Updates an existing appointment/event
+        cancel_appointment
+            Cancels/deletes an appointment from the calendar
+    Google Sheets Integration Tools (3)
+        post_call_data
+            Posts call/interaction data to Google Sheets for logging and analytics
+        get_clients
+            Gets client data from Google Sheets
+        add_clients
+            Adds client data to Google Sheets
+    Browser Automation Tools (4)
+        browser_navigate
+            Navigates to a URL with full JavaScript support
+        browser_interact
+            Performs interactions on web pages (click, type, submit, scroll, wait)
+        browser_extract
+            Extracts structured data from the current page (titles, text, links, metadata)
+        browser_screenshot
+            Captures a screenshot of the current page or a specific element
+
 Target Business Details:
 - Business Name: {business_context.name}
 - Industry: {business_context.industry}
@@ -193,9 +235,9 @@ Target Business Details:
 - Email: {business_context.email or 'Unknown'}
 
 Business Intelligence Available:
-- Services: {business_context.services_content[:500] if business_context.services_content else 'Not available'}
-- About: {business_context.about_content[:500] if business_context.about_content else 'Not available'}
-- Team: {business_context.team_content[:500] if business_context.team_content else 'Not available'}
+- Services: {business_context.services_content[:1000] if business_context.services_content else 'Not available'}
+- About: {business_context.about_content[:1000] if business_context.about_content else 'Not available'}
+- Team: {business_context.team_content[:1000] if business_context.team_content else 'Not available'}
 
 Your task is to create personalized, compelling content that:
 1. Shows deep understanding of their business and pain points
@@ -209,11 +251,10 @@ Generate content for these sections:
 
 2. HERO_SUBTITLE: A personalized subtitle explaining how AI agents help their specific business (2-3 sentences)
 
-3. DEMO_CONVERSATION: A realistic conversation between "Forge" and a potential customer, showing how the AI understands their business. Include:
+3. DEMO_CONVERSATION: A realistic conversation between "Forge" and a potential customer, demonstrating a use case for the voice agent. Include:
    - Forge greeting and introduction
-   - Customer question about their specific industry/service
-   - Forge's knowledgeable response showing business understanding
-   - Forge offering more help
+   - Customer question inquiry
+   - Forge's knowledgeable response showing business understanding OR Forge accessing a tool to help the customer 
 
 4. FEATURES: 3 key features personalized for their industry, each with title and description
 
@@ -415,7 +456,7 @@ I hope this email finds you well. My name is {sender_name} and I'm reaching out 
 
 As a leader in {industry}, you likely receive numerous inquiries daily about your services, scheduling, and general questions. What if you could provide instant, accurate responses 24/7 while your team focuses on what they do best?
 
-🎤 **Try Our AI Voice Assistant**
+🎤 **Try Our AI Voice Assistant - Tailored for Your Business**
 
 We've created a custom AI assistant trained specifically on {business_name}'s services, expertise, and unique value proposition. It can:
 
@@ -475,7 +516,8 @@ Best regards,
         recipient_email: str,
         recipient_name: Optional[str] = None,
         voice_agent_url: Optional[str] = None,
-        content_summary: Optional[Dict[str, str]] = None
+        content_summary: Optional[Dict[str, str]] = None,
+        voice_agent_id: Optional[str] = None
     ) -> EmailTemplate:
         """Compose personalized email for a business lead.
 
@@ -487,6 +529,7 @@ Best regards,
             recipient_name: Recipient name (if known)
             voice_agent_url: URL to the voice agent demo
             content_summary: Summary of business content
+            voice_agent_id: ElevenLabs agent ID to embed in the email
 
         Returns:
             Composed email template
@@ -497,13 +540,13 @@ Best regards,
             # Use intelligent LLM-based generation
             return self._compose_email_with_llm(
                 business_name, domain, industry, recipient_email,
-                recipient_name, voice_agent_url, content_summary
+                recipient_name, voice_agent_url, content_summary, voice_agent_id
             )
         else:
             # Fall back to template-based generation
             return self._compose_email_with_templates(
                 business_name, domain, industry, recipient_email,
-                recipient_name, voice_agent_url, content_summary
+                recipient_name, voice_agent_url, content_summary, voice_agent_id
             )
 
     def _compose_email_with_llm(
@@ -514,7 +557,8 @@ Best regards,
         recipient_email: str,
         recipient_name: Optional[str],
         voice_agent_url: Optional[str],
-        content_summary: Optional[Dict[str, str]]
+        content_summary: Optional[Dict[str, str]],
+        voice_agent_id: Optional[str]
     ) -> EmailTemplate:
         """Compose email using LLM intelligence.
 
@@ -586,7 +630,8 @@ Best regards,
         recipient_email: str,
         recipient_name: Optional[str],
         voice_agent_url: Optional[str],
-        content_summary: Optional[Dict[str, str]]
+        content_summary: Optional[Dict[str, str]],
+        voice_agent_id: Optional[str]
     ) -> EmailTemplate:
         """Compose email using fallback templates.
 
@@ -951,13 +996,15 @@ Best regards,
     def compose_email_for_lead(
         self,
         lead_domain: str,
-        emails_dir: str = "pipeline/emails"
+        emails_dir: str = "pipeline/emails",
+        voice_agent_id: Optional[str] = None
     ) -> Optional[EmailTemplate]:
         """Compose email for a lead by loading business data.
 
         Args:
             lead_domain: Domain of the lead business
             emails_dir: Directory to save emails
+            voice_agent_id: ElevenLabs agent ID to embed in the email
 
         Returns:
             Composed email template if successful

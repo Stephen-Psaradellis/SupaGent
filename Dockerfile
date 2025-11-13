@@ -59,11 +59,15 @@ WORKDIR /app
 # Copy application code (this changes frequently, so it's last)
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x scripts/entrypoint.sh
+
 # Create data directories
 RUN mkdir -p /app/data/chroma /app/data/sessions
 
 # Note: EXPOSE is not needed - Railway handles port binding automatically via PORT env var
 
-# Run the application with Doppler
+# Run the application with Doppler through entrypoint
 # Note: DOPPLER_TOKEN should be set as an environment variable in your deployment platform
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["doppler", "run", "--project", "shortforge", "--config", "dev", "--", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
