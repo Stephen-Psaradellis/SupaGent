@@ -38,7 +38,7 @@ from pipeline.lead_generation import Lead, slugify
 
 # Database imports
 from core.database import get_db_session
-from core.models import BusinessDomain, ScrapedContent, IntelligenceBundle, HunterEnrichment
+from core.models import BusinessDomain, ScrapedContent as ScrapedContentModel, IntelligenceBundle, HunterEnrichment
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -196,7 +196,7 @@ class BusinessIntelligenceLoader:
                 # Check if domain exists
                 business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
 
-                scraped_rows: List[ScrapedContent] = []
+                scraped_rows: List[ScrapedContentModel] = []
                 if business_domain:
                     # The schema uses an explicit FK column (`domain_id`); query via that column to
                     # stay aligned with the ORM mappings rather than relying on implicit lazy relationships.
@@ -238,7 +238,7 @@ class BusinessIntelligenceLoader:
                 # Save scraped content
                 for content_type, items in categorized_content.items():
                     for item in items:
-                        scraped_db = ScrapedContent(
+                        scraped_db = ScrapedContentModel(
                             domain_id=business_domain.id,
                             url=item.url,
                             title=item.title,
