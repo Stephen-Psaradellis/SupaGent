@@ -8,8 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt \
-    --mount=type=cache,id=apt-lists,target=/var/lib/apt/lists \
+RUN --mount=type=cache,id=cacheKey-apt-cache,target=/var/cache/apt \
+    --mount=type=cache,id=cacheKey-apt-lists,target=/var/lib/apt/lists \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -24,7 +24,7 @@ WORKDIR /app
 
 # Install Python dependencies with cacheable pip wheel cache
 COPY requirements.txt .
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=cacheKey-pip-cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --user -r requirements.txt
 
@@ -38,8 +38,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     BROWSER_USE_HEADLESS=1 \
     BROWSER_USE_DISABLE_SECURITY=1
 
-RUN --mount=type=cache,id=apt-cache2,target=/var/cache/apt \
-    --mount=type=cache,id=apt-lists2,target=/var/lib/apt/lists \
+RUN --mount=type=cache,id=cacheKey-apt-cache2,target=/var/cache/apt \
+    --mount=type=cache,id=cacheKey-apt-lists2,target=/var/lib/apt/lists \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         apt-transport-https \
@@ -70,7 +70,7 @@ RUN --mount=type=cache,id=apt-cache2,target=/var/cache/apt \
 COPY --from=builder /root/.local /root/.local
 
 # Install Playwright browsers (depends on runtime libs already installed)
-RUN --mount=type=cache,id=playwright-cache,target=/root/.cache/ms-playwright \
+RUN --mount=type=cache,id=cacheKey-playwright-cache,target=/root/.cache/ms-playwright \
     PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
     playwright install --with-deps
 
