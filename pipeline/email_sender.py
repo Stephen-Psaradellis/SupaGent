@@ -169,8 +169,10 @@ class EmailSender:
                     business_content = self._load_business_content(lead.domain)
 
                     # Generate personalized HTML
-                    # Use provided agent_id or fall back to environment variable
-                    agent_id_to_use = voice_agent_id or os.getenv("ELEVENLABS_AGENT_ID")
+                    # Use provided agent_id - should always be the ID of the created ElevenLabs agent
+                    if not voice_agent_id:
+                        logger.warning(f"No voice_agent_id provided for lead {lead.domain} - voice agent functionality will be limited")
+                    agent_id_to_use = voice_agent_id
                     html_content = self.email_composer.compose_personalized_html_email(
                         business_name=lead.name or lead.domain,
                         domain=lead.domain,

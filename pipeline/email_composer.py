@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .openrouter_client import OpenRouterClient, BusinessContext, AgentContext
+from core.database import get_db_session
+from core.models import BusinessDomain
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -154,7 +156,7 @@ class HTMLTemplateGenerator:
         """
         if not self.llm_client:
             logger.warning("No LLM client available, using default content")
-            return self._get_default_content(business_name, domain, industry)
+            return self._get_default_content(business_name, domain, industry, None)
 
         # Create business context
         business_context = BusinessContext(
@@ -179,7 +181,7 @@ class HTMLTemplateGenerator:
 
         except Exception as e:
             logger.error(f"Failed to generate personalized content: {e}")
-            return self._get_default_content(business_name, domain, industry)
+            return self._get_default_content(business_name, domain, industry, None)
 
     def _build_personalization_prompt(self, business_context: BusinessContext, lead_data: Dict) -> str:
         """Build the LLM prompt for content personalization."""
@@ -299,14 +301,13 @@ Make it sound professional, show industry expertise, and create urgency to try t
                 return json.loads(json_str)
             else:
                 logger.warning("No JSON found in LLM response, using default content")
-                return self._get_default_content("", "", "")
+                return self._get_default_content("", "", "", None)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response as JSON: {e}")
-            return self._get_default_content("", "", "")
+            return self._get_default_content("", "", "", None)
 
-    def _get_default_content(self, business_name: str, domain: str, industry: str) -> PersonalizedHTMLTemplate:
+    def _get_default_content(self, business_name: str, domain: str, industry: str, voice_agent_id: Optional[str] = None) -> PersonalizedHTMLTemplate:
         """Get default content when LLM generation fails."""
-        agent_id = os.getenv("ELEVENLABS_AGENT_ID", "")
         return PersonalizedHTMLTemplate(
             hero_title="See How AI Can Run Your Business",
             hero_subtitle="Your clients, leads, and internal ops don't need to wait for a human anymore. Our AI Voice Agents can qualify leads, schedule meetings, handle customer support, and trigger backend workflows — automatically.",
@@ -326,7 +327,7 @@ Make it sound professional, show industry expertise, and create urgency to try t
             pricing_subtitle="We design and deploy your first production-ready AI agent within two weeks.",
             urgency_title="Early Access Offer — Limited Seats",
             urgency_text="We're onboarding only 10 new clients this quarter to ensure quality. Get started now and your first AI agent setup is included free.",
-            voice_agent_id=agent_id
+            voice_agent_id=voice_agent_id
         )
 
     def generate_html_email(
@@ -797,16 +798,16 @@ Best regards,
         # Fill in template variables
         body = template.format(
             recipient_name=recipient_name or "there",
-            sender_name=os.getenv("SENDER_NAME", "Alex Johnson"),
+            sender_name="Stephen Psaradellis",
             business_name=business_name,
             industry=industry.lower(),
             value_proposition=value_proposition,
             voice_agent_url=voice_agent_url or "[Voice Agent Demo Link]",
             availability="next Tuesday at 2 PM",
-            sender_title=os.getenv("SENDER_TITLE", "AI Solutions Specialist"),
-            sender_company=os.getenv("SENDER_COMPANY", "VoiceGenius AI"),
-            sender_phone=os.getenv("SENDER_PHONE", "(555) 123-4567"),
-            sender_email=os.getenv("SENDER_EMAIL", "alex@voicegenius.ai")
+            sender_title="CEO & Founder",
+            sender_company="ShortForge LLC",
+            sender_phone="(224) 715-3678",
+            sender_email="stephen.psaradellis@shortforge.dev"
         )
 
         return body.strip()
@@ -871,6 +872,23 @@ Best regards,
 
         return notes
 
+    def _get_domain_id(self, domain: str) -> Optional[int]:
+        """Get the database ID for a business domain.
+
+        Args:
+            domain: Business domain name
+
+        Returns:
+            Domain ID or None if not found
+        """
+        try:
+            with get_db_session() as session:
+                business_domain = session.query(BusinessDomain).filter_by(domain=domain).first()
+                return business_domain.id if business_domain else None
+        except Exception as e:
+            logger.error(f"Failed to get domain ID for {domain}: {e}")
+            return None
+
     def compose_personalized_html_email(
         self,
         business_name: str,
@@ -917,11 +935,12 @@ Best regards,
             business_content=business_content
         )
 
-        # Set voice agent ID if provided, otherwise use environment variable
+        # Set voice agent ID - this should always be provided for the current lead
         if voice_agent_id:
             personalized_content.voice_agent_id = voice_agent_id
         else:
-            personalized_content.voice_agent_id = os.getenv("ELEVENLABS_AGENT_ID", "")
+            logger.warning("No voice_agent_id provided for personalized HTML email - voice agent functionality will be limited")
+            personalized_content.voice_agent_id = None
 
         # Generate final HTML
         html_email = self.html_generator.generate_html_email(personalized_content)
@@ -1019,8 +1038,13 @@ Best regards,
             # Load business content summary
             content_summary = self._load_business_content(lead_domain)
 
-            # Generate voice agent URL (placeholder for now)
-            voice_agent_url = f"https://your-app.com/voice-agent/{lead_domain.replace('.', '_')}"
+            # Generate voice agent URL using the new format
+            domain_id = self._get_domain_id(lead_domain)
+            if voice_agent_id and domain_id:
+                voice_agent_url = f"https://shortforge.dev/agent/{voice_agent_id}?domain_id={domain_id}"
+            else:
+                # Fallback URL if IDs are not available
+                voice_agent_url = f"https://shortforge.dev/agent/demo?domain={lead_domain}"
 
             # Compose email
             template = self.compose_email(
@@ -1030,7 +1054,8 @@ Best regards,
                 recipient_email=lead_data.get("email", ""),
                 recipient_name=None,  # Could be extracted from LinkedIn later
                 voice_agent_url=voice_agent_url,
-                content_summary=content_summary
+                content_summary=content_summary,
+                voice_agent_id=voice_agent_id
             )
 
             # Save template
@@ -1126,13 +1151,15 @@ def test_personalized_html_generation():
     composer = EmailComposer()
 
     print("🎨 Testing personalized HTML email generation...")
+    # Use a test agent ID instead of environment variable
+    test_agent_id = "test_agent_12345"
     html_email = composer.compose_personalized_html_email(
         business_name="Printers Row Dental Studio",
         domain="prdentalstudio.com",
         industry="dentist",
         lead_data=lead_data,
         business_content=business_content,
-        voice_agent_id=os.getenv("ELEVENLABS_AGENT_ID")
+        voice_agent_id=test_agent_id
     )
 
     # Save the generated HTML for inspection

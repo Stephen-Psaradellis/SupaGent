@@ -1069,11 +1069,11 @@ def main():
         )
 
         sender = {
-            "name": "AI Solutions Specialist",
-            "title": "AI Solutions Specialist",
-            "company": "VoiceGenius AI",
-            "email": "hello@voicegenius.ai",
-            "phone": "(555) 123-4567"
+            "name": "Stephen Psaradellis",
+            "title": "CEO & Founder",
+            "company": "ShortForge LLC",
+            "email": "stephen.psaradellis@shortforge.dev",
+            "phone": "(224) 715-3678"
         }
 
         # Generate email
