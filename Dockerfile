@@ -26,7 +26,7 @@ WORKDIR /app
 
 # Install Python dependencies with cacheable pip wheel cache
 COPY requirements.txt .
-RUN --mount=type=cache,id=cache-pip-cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=cacheKey-pip-cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip setuptools wheel && \
     python -m pip install --user -r requirements.txt
 
