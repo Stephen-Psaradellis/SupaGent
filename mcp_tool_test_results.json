@@ -1,0 +1,154 @@
+{
+  "total_tests": 18,
+  "passed_tests": 18,
+  "failed_tests": 0,
+  "pass_rate": 1.0,
+  "total_execution_time": 0.8394181728363037,
+  "avg_execution_time": 0.04663434293535021,
+  "results": [
+    {
+      "scenario_name": "search_knowledge_base_tool_test",
+      "passed": true,
+      "execution_time": 0.6944687366485596,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "create_support_ticket_tool_test",
+      "passed": true,
+      "execution_time": 0.042226552963256836,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "get_customer_info_tool_test",
+      "passed": true,
+      "execution_time": 0.043417930603027344,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "escalate_to_human_tool_test",
+      "passed": true,
+      "execution_time": 0.009868144989013672,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "log_interaction_tool_test",
+      "passed": true,
+      "execution_time": 0.007439374923706055,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "check_order_status_tool_test",
+      "passed": true,
+      "execution_time": 0.010570287704467773,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "check_availability_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "get_user_bookings_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 4,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "book_appointment_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 3,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "modify_appointment_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 3,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "cancel_appointment_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 3,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "post_call_data_tool_test",
+      "passed": true,
+      "execution_time": 0.008647680282592773,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "get_clients_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "add_clients_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "browser_navigate_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "browser_interact_tool_test",
+      "passed": true,
+      "execution_time": 0.022779464721679688,
+      "errors": [],
+      "tool_calls_made": 3,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "browser_extract_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 2,
+      "responses_received": 1
+    },
+    {
+      "scenario_name": "browser_screenshot_tool_test",
+      "passed": true,
+      "execution_time": 0.0,
+      "errors": [],
+      "tool_calls_made": 1,
+      "responses_received": 1
+    }
+  ]
+}

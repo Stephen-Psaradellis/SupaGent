@@ -1,9 +1,9 @@
 # Core web framework
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+fastapi>=0.121.2
+uvicorn[standard]>=0.38.0
 
 # Model Context Protocol SDK
-mcp>=1.10.1
+mcp>=1.21.1
 
 # LangChain ecosystem
 langchain>=0.1.0
@@ -22,9 +22,9 @@ faiss-cpu>=1.7.4  # Compiles C++ - takes 3-5 minutes
 sentence-transformers>=2.2.0
 
 # Utilities
-pydantic>=2.11.5
+pydantic>=2.12.4
 python-dotenv>=1.0.1
-python-multipart>=0.0.6  # Required for FastAPI form data
+python-multipart>=0.0.20  # Required for FastAPI form data
 httpx>=0.28.1
 beautifulsoup4>=4.12.0
 markdownify>=0.11.6

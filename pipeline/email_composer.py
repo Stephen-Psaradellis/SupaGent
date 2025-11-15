@@ -82,6 +82,7 @@ class PersonalizedHTMLTemplate:
     urgency_title: str
     urgency_text: str
     voice_agent_id: Optional[str] = None
+    voice_agent_url: Optional[str] = None
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization."""
@@ -96,6 +97,7 @@ class PersonalizedHTMLTemplate:
             "urgency_title": self.urgency_title,
             "urgency_text": self.urgency_text,
             "voice_agent_id": self.voice_agent_id,
+            "voice_agent_url": self.voice_agent_url,
         }
 
 
@@ -327,7 +329,8 @@ Make it sound professional, show industry expertise, and create urgency to try t
             pricing_subtitle="We design and deploy your first production-ready AI agent within two weeks.",
             urgency_title="Early Access Offer — Limited Seats",
             urgency_text="We're onboarding only 10 new clients this quarter to ensure quality. Get started now and your first AI agent setup is included free.",
-            voice_agent_id=voice_agent_id
+            voice_agent_id=voice_agent_id,
+            voice_agent_url=None
         )
 
     def generate_html_email(
@@ -349,6 +352,7 @@ Make it sound professional, show industry expertise, and create urgency to try t
             "{{hero_title}}": personalized_content.hero_title,
             "{{hero_subtitle}}": personalized_content.hero_subtitle,
             "{{company_name}}": personalized_content.company_name,
+            "{{voice_agent_url}}": personalized_content.voice_agent_url or "#voice-agent",
             "{{pricing_title}}": personalized_content.pricing_title,
             "{{pricing_subtitle}}": personalized_content.pricing_subtitle,
             "{{urgency_title}}": personalized_content.urgency_title,
@@ -889,6 +893,18 @@ Best regards,
             logger.error(f"Failed to get domain ID for {domain}: {e}")
             return None
 
+    def _build_voice_agent_url(self, domain: str, voice_agent_id: Optional[str]) -> str:
+        """Construct the public demo URL for a given voice agent/domain pair."""
+        domain_id = self._get_domain_id(domain)
+        if voice_agent_id and domain_id:
+            logger.info(f"URL generated: https://shortforge.dev/agent/{voice_agent_id}?domain_id={domain_id}")
+            return f"https://shortforge.dev/agent/{voice_agent_id}?domain_id={domain_id}"
+        if voice_agent_id:
+            logger.info(f"URL generated: https://shortforge.dev/agent/{voice_agent_id}?domain={domain} (no domain_id)")
+            return f"https://shortforge.dev/agent/{voice_agent_id}?domain={domain}"
+        logger.info(f"URL generated: https://shortforge.dev/agent/demo?domain={domain} (no voice_agent_id or domain_id)")
+        return f"https://shortforge.dev/agent/demo?domain={domain}"
+
     def compose_personalized_html_email(
         self,
         business_name: str,
@@ -941,6 +957,8 @@ Best regards,
         else:
             logger.warning("No voice_agent_id provided for personalized HTML email - voice agent functionality will be limited")
             personalized_content.voice_agent_id = None
+
+        personalized_content.voice_agent_url = self._build_voice_agent_url(domain, voice_agent_id)
 
         # Generate final HTML
         html_email = self.html_generator.generate_html_email(personalized_content)
@@ -1039,12 +1057,7 @@ Best regards,
             content_summary = self._load_business_content(lead_domain)
 
             # Generate voice agent URL using the new format
-            domain_id = self._get_domain_id(lead_domain)
-            if voice_agent_id and domain_id:
-                voice_agent_url = f"https://shortforge.dev/agent/{voice_agent_id}?domain_id={domain_id}"
-            else:
-                # Fallback URL if IDs are not available
-                voice_agent_url = f"https://shortforge.dev/agent/demo?domain={lead_domain}"
+            voice_agent_url = self._build_voice_agent_url(lead_domain, voice_agent_id)
 
             # Compose email
             template = self.compose_email(
