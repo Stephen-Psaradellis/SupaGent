@@ -167,11 +167,6 @@ def reset_engine() -> None:
         logger.info("Database engine reset")
 
 
-# Initialize tables on import if running in Railway environment
-config = get_config()
-if config.database_url and config.is_railway():
-    try:
-        create_tables()
-        logger.info("Database tables initialized for Railway environment")
-    except Exception as e:
-        logger.warning(f"Could not initialize database tables: {e}")
+# Database table initialization is handled by the application startup process
+# This prevents issues during Docker build when DATABASE_URL may not be available
+# Tables will be created when the FastAPI app starts up
