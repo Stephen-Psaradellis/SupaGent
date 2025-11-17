@@ -2,7 +2,7 @@
 # Add these to your Railway environment variables (not .env file)
 
 # Required Google OAuth2 Configuration
-GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_ID=383011377067-tk10hrprcnmpkf1oqitmh2jasi8oh3it.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 GOOGLE_REDIRECT_URI=https://your-railway-app.railway.app/oauth/callback
 
