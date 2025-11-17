@@ -21,7 +21,7 @@ from googleapiclient.errors import HttpError
 
 
 # Scopes required for Calendar API
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
 
 class GoogleCalendarClient:

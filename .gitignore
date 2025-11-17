@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 
 dataset/company/
+visualizations/
 .Python
 build/
 develop-eggs/
@@ -211,3 +212,9 @@ __marimo__/
 # Large dataset files
 pipeline/yelp_academic_dataset_business.json
 pipeline/cache/*.sqlite3
+
+# Google OAuth credentials and tokens (NEVER commit these!)
+credentials.json
+*_token.json
+calendar_sheets_token.json
+token.json

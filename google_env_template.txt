@@ -1,0 +1,12 @@
+# Google Workspace Configuration Template
+# Add these to your .env file
+
+# Google Workspace Integration (Read-Only Scopes)
+GOOGLE_CALENDAR_CREDENTIALS_PATH=credentials.json
+GOOGLE_CALENDAR_TOKEN_PATH=calendar_token.json
+GOOGLE_SHEETS_CREDENTIALS_PATH=credentials.json
+GOOGLE_SHEETS_TOKEN_PATH=sheets_token.json
+GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id_here
+
+# Note: Using read-only scopes to avoid OAuth verification requirements
+# If you need write access, you'll need to complete Google's verification process

@@ -18,7 +18,7 @@ from googleapiclient.errors import HttpError
 
 
 # Scopes required for Sheets API
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 
 class GoogleSheetsClient:

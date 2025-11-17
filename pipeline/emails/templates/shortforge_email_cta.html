@@ -5,31 +5,82 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ShortForge Consultancy - AI Voice Agent Demo</title>
 <style>
-/* Keeping original styling for email compatibility */
+/* ShortForge CSS Variables - Matching NextJS Theme */
+:root {
+  --forge-black: #000000;
+  --forge-obsidian: #0A0A0A;
+  --forge-charcoal: #141414;
+  --forge-slate: #1A1A1A;
+  --forge-smoke: #242424;
+  --ember-glow: #FF3B30;
+  --ember-fire: #E6251A;
+  --ember-heat: #C50000;
+}
+
+/* Email compatibility styles */
 body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
 table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
 img { -ms-interpolation-mode: bicubic; }
-body { margin: 0 !important; padding: 0 !important; background-color: #0a0a0a; font-family: 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; color: #ffffff; }
-.container { max-width: 600px; margin: 0 auto; background-color: #111111; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); }
-.header { background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%); padding: 30px; text-align: center; border-bottom: 1px solid #333333; }
-.logo { font-size: 24px; font-weight: 800; margin: 0 0 5px 0; color: #ffffff; letter-spacing: -0.5px; }
-.tagline { font-size: 12px; color: #888888; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
-.hero-section { padding: 60px 30px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.hero-title { font-size: 48px; font-weight: 900; margin: 0 0 20px 0; line-height: 1.1; color: white; }
-.hero-subtitle { font-size: 18px; margin: 0 0 40px 0; line-height: 1.5; opacity: 0.9; color: rgba(255,255,255,0.9); }
-.hero-cta, .secondary-cta { display: inline-block; border-radius: 50px; font-weight: 700; text-decoration: none; }
-.hero-cta { background-color: #ffffff; color: #667eea; padding: 18px 50px; margin-bottom: 20px; }
+
+/* Base styles - ShortForge Theme */
+body { margin: 0 !important; padding: 0 !important; background-color: var(--forge-black); font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace; color: #ffffff; }
+.container { max-width: 600px; margin: 0 auto; background: linear-gradient(180deg, var(--forge-obsidian) 0%, var(--forge-black) 100%); box-shadow: 0 0 40px rgba(197, 0, 0, 0.2); border: 1px solid var(--forge-smoke); }
+
+/* Header with ShortForge Logo */
+.header { background: linear-gradient(135deg, var(--forge-black) 0%, var(--forge-obsidian) 100%); padding: 30px; text-align: center; border-bottom: 1px solid var(--forge-smoke); }
+.logo-container { width: 120px; height: 120px; margin: 0 auto 10px auto; display: block; }
+.logo-svg { width: 100%; height: 100%; display: block; }
+.tagline { font-size: 12px; color: #525252; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Hero Section - Ember Gradient */
+.hero-section { padding: 60px 30px; text-align: center; background: linear-gradient(135deg, rgba(197, 0, 0, 0.8) 0%, rgba(255, 59, 48, 0.8) 100%); position: relative; }
+.hero-section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, rgba(197, 0, 0, 0.3), transparent); pointer-events: none; }
+.hero-title { font-size: 48px; font-weight: 900; margin: 0 0 20px 0; line-height: 1.1; color: white; position: relative; z-index: 1; }
+.hero-subtitle { font-size: 18px; margin: 0 0 40px 0; line-height: 1.5; opacity: 0.9; color: rgba(255,255,255,0.9); position: relative; z-index: 1; }
+
+/* CTA Buttons - Ember Theme */
+.hero-cta, .secondary-cta { display: inline-block; border-radius: 25px; font-weight: 700; text-decoration: none; position: relative; z-index: 1; transition: all 0.3s ease; }
+.hero-cta { background: linear-gradient(135deg, var(--ember-heat) 0%, var(--ember-glow) 100%); color: white; padding: 18px 50px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(255, 59, 48, 0.3); border: 2px solid var(--ember-fire); }
+.hero-cta:hover { box-shadow: 0 6px 30px rgba(255, 59, 48, 0.5); transform: translateY(-2px); }
 .secondary-cta { color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 2px; }
-.demo-section { padding: 60px 30px; background-color: #111111; text-align: center; }
-.mockup-content { color: #00ff88; font-family: 'SF Mono', monospace; font-size: 14px; line-height: 1.6; text-align: left; }
+
+/* Demo Section - Forge Colors */
+.demo-section { padding: 60px 30px; background: linear-gradient(135deg, var(--forge-charcoal) 0%, var(--forge-slate) 100%); text-align: center; border-top: 1px solid var(--forge-smoke); }
+.mockup-content { color: var(--ember-glow); font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.6; text-align: left; background: var(--forge-obsidian); padding: 20px; border-radius: 8px; border: 1px solid var(--forge-smoke); }
+
+/* Features Section */
 .features-section, .pricing-section, .urgency-section, .footer { padding: 60px 30px; text-align: center; }
+.features-section { background: var(--forge-slate); }
 .feature-title { font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 10px; }
-.feature-desc { color: #888888; line-height: 1.6; }
+.feature-desc { color: #666666; line-height: 1.6; }
+
+/* Pricing Section */
+.pricing-section { background: var(--forge-charcoal); }
 .pricing-title { font-size: 36px; font-weight: 800; color: #ffffff; margin-bottom: 15px; }
-.pricing-subtitle { font-size: 16px; color: #888888; margin-bottom: 40px; }
-.footer { background-color: #000000; border-top: 1px solid #333333; }
+.pricing-subtitle { font-size: 16px; color: #666666; margin-bottom: 40px; }
+
+/* Pricing Card - Forge Theme */
+.pricing-card { background: linear-gradient(135deg, var(--forge-slate) 0%, var(--forge-smoke) 100%); padding: 30px; border-radius: 20px; max-width: 400px; margin: 0 auto; border: 2px solid var(--ember-heat); box-shadow: 0 0 30px rgba(197, 0, 0, 0.3); }
+.pricing-plan-title { color: #525252; text-transform: uppercase; letter-spacing: 1px; font-size: 14px; }
+.pricing-amount { color: #fff; font-size: 48px; margin: 10px 0; }
+.pricing-unit { color: #666666; }
+.pricing-features { list-style: none; padding: 0; color: #cccccc; text-align: left; margin-top: 20px; }
+.pricing-features li { margin-bottom: 8px; }
+.pricing-cta { display: inline-block; margin-top: 25px; background: linear-gradient(135deg, var(--ember-heat) 0%, var(--ember-glow) 100%); padding: 16px 40px; border-radius: 25px; color: white; font-weight: 700; text-decoration: none; box-shadow: 0 4px 20px rgba(255, 59, 48, 0.3); border: 2px solid var(--ember-fire); }
+.pricing-cta:hover { box-shadow: 0 6px 30px rgba(255, 59, 48, 0.5); transform: translateY(-2px); }
+
+/* Urgency Section - Ember Theme */
+.urgency-section { background: linear-gradient(135deg, var(--ember-heat) 0%, var(--ember-fire) 100%); color: white; padding: 40px 30px; }
+.urgency-title { font-size: 24px; font-weight: 700; margin-bottom: 15px; }
+.urgency-text { font-size: 16px; opacity: 0.9; margin-bottom: 25px; }
+.urgency-cta { display: inline-block; background: white; color: var(--ember-heat); padding: 16px 40px; border-radius: 25px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
+.urgency-cta:hover { box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3); transform: translateY(-2px); }
+
+/* Footer - Forge Black */
+.footer { background: var(--forge-black); border-top: 1px solid var(--forge-smoke); }
 .footer-text { color: #666666; font-size: 14px; margin-bottom: 20px; }
-.footer-link { color: #888888; text-decoration: none; margin: 0 15px; font-size: 14px; }
+.footer-link { color: #525252; text-decoration: none; margin: 0 15px; font-size: 14px; }
+.footer-link:hover { color: var(--ember-glow); }
 </style>
 </head>
 <body>
@@ -38,7 +89,45 @@ body { margin: 0 !important; padding: 0 !important; background-color: #0a0a0a; f
   </span>
   <div class="container">
     <div class="header">
-      <h1 class="logo">ShortForge Consultancy</h1>
+      <div class="logo-container">
+        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" class="logo-svg"
+        viewBox="0 0 1500 1700" width="120" height="120"
+        preserveAspectRatio="xMidYMid meet">
+   
+     <!-- ORIGINAL LOGO — UNTOUCHED -->
+      <path transform="translate(-350,-250)" fill="#000" stroke="#FFF" stroke-width="2" d="M 1023.33 433.154 C 1043.77 433.414 1214.18 431.793 1219.3 434.053 C 1281.64 492.682 1345.62 550.844 1407.34 609.852 L 1407.4 849.689 C 1407.29 908.046 1406.4 970.787 1407.75 1029.01 L 1407.99 1231.77 L 1203.85 1231.81 L 1139 1231.76 C 1127.97 1231.76 1114.32 1232.25 1103.63 1231.58 C 1119.3 1253.33 1135.77 1273.79 1152.07 1295.04 C 1182.22 1334.34 1212.07 1373.87 1241.62 1413.63 C 1254 1413.04 1266.81 1413.01 1279.22 1413.17 C 1321.76 1413.72 1364.73 1412.44 1407.24 1413.5 C 1407.58 1456.14 1407.61 1498.77 1407.33 1541.41 C 1407.32 1564.93 1407.91 1590.98 1407.25 1614.29 L 1122.68 1614.74 L 1024.23 1518.81 C 1023.31 1549.84 1023.93 1583.58 1023.99 1614.76 C 1005.32 1614.72 832.575 1615.51 829.009 1613.83 C 812.495 1596.83 791.241 1578.55 773.937 1561.99 C 730.016 1519.98 683.74 1479.27 639.87 1437.37 L 639.926 1029.17 L 639.789 818.81 C 740.609 819.064 844.53 819.714 945.176 818.576 C 915.339 778.615 885.193 738.886 854.743 699.391 C 841.344 681.85 818.428 649.8 804.431 634.248 C 749.899 634.334 694.319 634.94 639.872 634.226 L 639.954 433.416 L 925.341 433.328 C 955.737 464.739 991.85 496.348 1023.3 528.131 C 1022.91 496.705 1023.23 464.619 1023.33 433.154 z"/>
+      <path transform="translate(-350,-250)" fill="#404040" stroke="FFF" stroke-width="2" d="M 945.176 818.576 C 970.401 850.981 1000.23 888.763 1023.97 922.009 L 1023.9 1029.3 L 752.037 1029.17 C 715.372 1029.16 676.297 1029.92 639.926 1029.17 L 639.789 818.81 C 740.609 819.064 844.53 819.714 945.176 818.576 z"/>
+      <path transform="translate(-350,-250)" fill="#FFF" stroke="#FFF" stroke-width="2" d="M 1023.33 433.154 C 1043.77 433.414 1214.18 431.793 1219.3 434.053 C 1217.97 443.336 1218.52 470.096 1218.53 480.742 L 1218.67 572.054 L 1218.71 735.868 C 1218.7 762.432 1217.93 792.573 1218.74 818.811 C 1155.18 818.402 1087.02 817.61 1023.65 818.968 L 1023.66 604.522 C 1023.67 595.639 1024.48 533.48 1023.3 528.131 C 1022.91 496.705 1023.23 464.619 1023.33 433.154 z"/>
+      <path transform="translate(-350,-250)" fill="#808080" stroke="#FFF" stroke-width="2" d="M 828.663 1231.67 L 1024.08 1231.2 C 1023.36 1296.66 1023.8 1363.38 1023.99 1428.88 C 1024.06 1447.82 1024.02 1466.76 1023.86 1485.7 C 1023.81 1494.63 1023.34 1510.28 1024.23 1518.81 C 1023.31 1549.84 1023.93 1583.58 1023.99 1614.76 C 1005.32 1614.72 832.575 1615.51 829.009 1613.83 C 829.632 1599.64 829.078 1580.68 829.063 1566.08 L 828.986 1473.71 C 828.929 1393.37 829.618 1311.87 828.663 1231.67 z"/>
+      <path transform="translate(-350,-250)" fill="#BFBFBF" stroke="#FFF" stroke-width="2" d="M 1023.88 1029.52 C 1067.98 1029.16 1112.09 1029.07 1156.19 1029.26 L 1407.75 1029.01 L 1407.99 1231.77 L 1203.85 1231.81 L 1139 1231.76 C 1127.97 1231.76 1114.32 1232.25 1103.63 1231.58 C 1078.25 1198.93 1047.84 1161.51 1023.75 1128.57 C 1022.58 1097.75 1023.6 1060.63 1023.88 1029.52 z"/>
+     <!-- logo complete -->
+   
+     <!-- NEW TEXT -->
+     <style>
+       .codefont {
+         font-family: "JetBrains Mono", monospace;
+         font-size: 220px;
+         font-weight: 700;
+         text-shadow:
+           0.25px  0.25px 0 #FFF,
+          -0.25px  0.25px 0 #FFF,
+           0.25px -0.25px 0 #FFF,
+          -0.25px -0.25px 0 #FFF,
+           0.25px  0px 0 #FFF,
+          -0.25px  0px 0 #FFF,
+           0px  0.25px 0 #FFF,
+           0px -0.25px 0 #FFF;
+       }
+     </style>
+   
+      <text x="350" y="1650" text-anchor="middle" class="codefont" fill="#1A1A1A">
+        Short
+      </text>
+      <text x="985" y="1650" text-anchor="middle" class="codefont" fill="#E91A40">Forge</text>
+   
+   </svg>
+   
+      </div>
       <p class="tagline">Intelligent Automation Systems</p>
     </div>
 
@@ -65,24 +154,24 @@ body { margin: 0 !important; padding: 0 !important; background-color: #0a0a0a; f
     <div class="pricing-section">
       <h2 class="pricing-title">{{pricing_title}}</h2>
       <p class="pricing-subtitle">{{pricing_subtitle}}</p>
-      <div style="background:#1a1a1a;padding:30px;border-radius:20px;max-width:400px;margin:0 auto;border:2px solid #667eea;">
-        <h3 style="color:#888;text-transform:uppercase;letter-spacing:1px;">Professional Plan</h3>
-        <h1 style="color:#fff;font-size:48px;margin:10px 0;">From $99/mo</h1>
-        <p style="color:#888;">per agent</p>
-        <ul style="list-style:none;padding:0;color:#ccc;text-align:left;margin-top:20px;">
+      <div class="pricing-card">
+        <h3 class="pricing-plan-title">Professional Plan</h3>
+        <h1 class="pricing-amount">From $99/mo</h1>
+        <p class="pricing-unit">per agent</p>
+        <ul class="pricing-features">
           <li>✓ Voice + workflow agent setup</li>
           <li>✓ CRM and API integrations</li>
           <li>✓ 24/7 uptime monitoring</li>
           <li>✓ Free onboarding call</li>
         </ul>
-        <a href="https://shortforge.dev/contact" style="display:inline-block;margin-top:25px;background:linear-gradient(135deg,#667eea,#764ba2);padding:16px 40px;border-radius:30px;color:white;font-weight:700;text-decoration:none;">Start Your Trial</a>
+        <a href="https://shortforge.dev/contact" class="pricing-cta">Start Your Trial</a>
       </div>
     </div>
 
-    <div class="urgency-section" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);color:white;padding:40px 30px;">
-      <h3 style="font-size:24px;font-weight:700;margin-bottom:15px;">{{urgency_title}}</h3>
-      <p style="font-size:16px;opacity:0.9;margin-bottom:25px;">{{urgency_text}}</p>
-      <a href="https://shortforge.dev/contact" style="display:inline-block;background:white;color:#dc2626;padding:16px 40px;border-radius:25px;font-weight:700;text-decoration:none;">Reserve Your Spot</a>
+    <div class="urgency-section">
+      <h3 class="urgency-title">{{urgency_title}}</h3>
+      <p class="urgency-text">{{urgency_text}}</p>
+      <a href="https://shortforge.dev/contact" class="urgency-cta">Reserve Your Spot</a>
     </div>
 
     <div class="footer">
