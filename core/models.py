@@ -12,6 +12,9 @@ from typing import Any, Dict, Optional
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from cryptography.fernet import Fernet
+import os
+from typing import ClassVar
 
 Base = declarative_base()
 
@@ -155,3 +158,93 @@ class HunterEnrichment(Base):
 
 # Add the hunter_enrichments relationship to BusinessDomain
 BusinessDomain.hunter_enrichments = relationship("HunterEnrichment", back_populates="business_domain", cascade="all, delete-orphan")
+
+
+class GoogleTokens(Base):
+    """Stores encrypted Google OAuth2 tokens for secure token management.
+
+    All token fields are encrypted before storage to protect sensitive data.
+    """
+
+    __tablename__ = "google_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    service_name = Column(String(50), nullable=False, index=True)  # 'calendar', 'sheets', etc.
+    access_token = Column(Text, nullable=False)  # Encrypted
+    refresh_token = Column(Text, nullable=True)  # Encrypted
+    token_expiry = Column(DateTime, nullable=True)
+    token_type = Column(String(50), nullable=True)  # Usually 'Bearer'
+    scope = Column(Text, nullable=True)  # Space-separated scopes
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Cache for generated encryption key to ensure consistency
+    _cached_encryption_key: ClassVar[Optional[bytes]] = None
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_google_tokens_service', 'service_name'),
+        Index('idx_google_tokens_expiry', 'token_expiry'),
+    )
+
+    @classmethod
+    def _get_encryption_key(cls) -> bytes:
+        """Get or create encryption key for token storage.
+
+        Caches the generated key to ensure encryption/decryption consistency.
+        """
+        # First check environment variable
+        key = os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY")
+        if key:
+            return key.encode() if isinstance(key, str) else key
+
+        # Use cached key if available
+        if cls._cached_encryption_key is not None:
+            return cls._cached_encryption_key
+
+        # Generate new key and cache it
+        generated_key = Fernet.generate_key()
+        cls._cached_encryption_key = generated_key
+
+        # Only show warning on first generation
+        if not hasattr(cls, '_warned_about_key_generation'):
+            key_str = generated_key.decode()
+            print(f"⚠️  WARNING: Generated new encryption key: {key_str}")
+            print("Set GOOGLE_TOKEN_ENCRYPTION_KEY environment variable for production")
+            cls._warned_about_key_generation = True
+
+        return generated_key
+
+    def encrypt_token(self, token: str) -> str:
+        """Encrypt a token for storage."""
+        if not token:
+            return token
+        f = Fernet(self._get_encryption_key())
+        return f.encrypt(token.encode()).decode()
+
+    def decrypt_token(self, encrypted_token: str) -> str:
+        """Decrypt a stored token."""
+        if not encrypted_token:
+            return encrypted_token
+        f = Fernet(self._get_encryption_key())
+        return f.decrypt(encrypted_token.encode()).decode()
+
+    def set_access_token(self, token: str):
+        """Set and encrypt access token."""
+        self.access_token = self.encrypt_token(token)
+
+    def get_access_token(self) -> str:
+        """Get and decrypt access token."""
+        return self.decrypt_token(self.access_token)
+
+    def set_refresh_token(self, token: str):
+        """Set and encrypt refresh token."""
+        self.refresh_token = self.encrypt_token(token) if token else None
+
+    def get_refresh_token(self) -> str:
+        """Get and decrypt refresh token."""
+        return self.decrypt_token(self.refresh_token) if self.refresh_token else None
+
+    def __repr__(self) -> str:
+        return f"<GoogleTokens(service='{self.service_name}', expiry={self.token_expiry})>"
