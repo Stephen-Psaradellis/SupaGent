@@ -1,5 +1,5 @@
 """
-Google Calendar API integration.
+Google Calendar API integration with secure OAuth2 token management.
 
 Provides functionality to interact with Google Calendar API for:
 - Checking availability
@@ -7,89 +7,53 @@ Provides functionality to interact with Google Calendar API for:
 - Creating appointments
 - Modifying appointments
 - Canceling appointments
+
+Uses database-stored tokens with automatic refresh, no filesystem credentials required.
 """
 from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from core.google_oauth_manager import get_calendar_oauth_manager
 
 
 # Scopes required for Calendar API
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events'
+]
 
 
 class GoogleCalendarClient:
-    """Client for interacting with Google Calendar API.
-    
-    Handles authentication and provides methods for calendar operations.
+    """Client for interacting with Google Calendar API using database-stored tokens.
+
+    Handles authentication with automatic token refresh and provides methods for calendar operations.
     """
-    
-    def __init__(
-        self,
-        credentials_path: Optional[str] = None,
-        token_path: Optional[str] = None,
-        calendar_id: Optional[str] = "primary",
-    ):
+
+    def __init__(self, calendar_id: Optional[str] = None):
         """Initialize Google Calendar client.
-        
+
         Args:
-            credentials_path: Path to OAuth2 credentials JSON file
-            token_path: Path to store/load OAuth2 token
             calendar_id: Calendar ID to use (default: "primary")
         """
-        self.credentials_path = credentials_path or os.getenv(
-            "GOOGLE_CALENDAR_CREDENTIALS_PATH",
-            "credentials.json"
-        )
-        self.token_path = token_path or os.getenv(
-            "GOOGLE_CALENDAR_TOKEN_PATH",
-            "token.json"
-        )
-        self.calendar_id = calendar_id or os.getenv(
-            "GOOGLE_CALENDAR_ID",
-            "primary"
-        )
+        self.calendar_id = calendar_id or os.getenv("GOOGLE_CALENDAR_ID", "primary")
+        self.oauth_manager = get_calendar_oauth_manager()
         self.service = None
         self._authenticate()
-    
+
     def _authenticate(self) -> None:
-        """Authenticate with Google Calendar API."""
-        creds = None
-        
-        # Load existing token
-        if os.path.exists(self.token_path):
-            try:
-                creds = Credentials.from_authorized_user_file(
-                    self.token_path, SCOPES
-                )
-            except Exception:
-                pass
-        
-        # If no valid credentials, get new ones
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                if not os.path.exists(self.credentials_path):
-                    raise FileNotFoundError(
-                        f"Credentials file not found: {self.credentials_path}. "
-                        "Please download OAuth2 credentials from Google Cloud Console."
-                    )
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path, SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-            
-            # Save credentials for next run
-            with open(self.token_path, 'w') as token:
-                token.write(creds.to_json())
-        
+        """Authenticate with Google Calendar API using stored tokens."""
+        creds = self.oauth_manager.get_credentials()
+
+        if not creds:
+            raise ValueError(
+                "No valid Google OAuth tokens found. "
+                "Please complete OAuth flow at /oauth/start"
+            )
+
         self.service = build('calendar', 'v3', credentials=creds)
     
     def check_availability(
@@ -490,23 +454,17 @@ class GoogleCalendarClient:
 
 def get_google_calendar_client() -> Optional[GoogleCalendarClient]:
     """Factory function to get configured Google Calendar client.
-    
+
     Returns:
-        GoogleCalendarClient instance if configured, None otherwise.
+        GoogleCalendarClient instance if OAuth tokens are available, None otherwise.
     """
     try:
-        credentials_path = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_PATH")
-        token_path = os.getenv("GOOGLE_CALENDAR_TOKEN_PATH")
-        calendar_id = os.getenv("GOOGLE_CALENDAR_ID", "primary")
-        
-        if not credentials_path:
+        oauth_manager = get_calendar_oauth_manager()
+        if not oauth_manager.is_authenticated():
             return None
-        
-        return GoogleCalendarClient(
-            credentials_path=credentials_path,
-            token_path=token_path,
-            calendar_id=calendar_id,
-        )
+
+        calendar_id = os.getenv("GOOGLE_CALENDAR_ID", "primary")
+        return GoogleCalendarClient(calendar_id=calendar_id)
     except Exception:
         return None
 

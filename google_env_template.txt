@@ -1,12 +1,18 @@
-# Google Workspace Configuration Template
-# Add these to your .env file
+# Google OAuth2 Configuration Template for Railway Deployment
+# Add these to your Railway environment variables (not .env file)
 
-# Google Workspace Integration (Read-Only Scopes)
-GOOGLE_CALENDAR_CREDENTIALS_PATH=credentials.json
-GOOGLE_CALENDAR_TOKEN_PATH=calendar_token.json
-GOOGLE_SHEETS_CREDENTIALS_PATH=credentials.json
-GOOGLE_SHEETS_TOKEN_PATH=sheets_token.json
-GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id_here
+# Required Google OAuth2 Configuration
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_REDIRECT_URI=https://your-railway-app.railway.app/oauth/callback
 
-# Note: Using read-only scopes to avoid OAuth verification requirements
-# If you need write access, you'll need to complete Google's verification process
+# Optional Configuration
+GOOGLE_CALENDAR_ID=primary
+GOOGLE_TOKEN_ENCRYPTION_KEY=your_32_char_encryption_key_here
+
+# Database (automatically configured by Railway)
+DATABASE_URL=postgresql://...
+
+# Note: No credentials.json or token.json files needed
+# Tokens are stored encrypted in PostgreSQL database
+# Complete OAuth flow at /oauth/start endpoint after deployment

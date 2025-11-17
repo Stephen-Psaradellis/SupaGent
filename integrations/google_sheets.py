@@ -15,6 +15,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from core.google_token_manager import get_google_credentials_path, get_google_token_path
 
 
 # Scopes required for Sheets API
@@ -34,20 +35,14 @@ class GoogleSheetsClient:
         spreadsheet_id: Optional[str] = None,
     ):
         """Initialize Google Sheets client.
-        
+
         Args:
             credentials_path: Path to OAuth2 credentials JSON file
             token_path: Path to store/load OAuth2 token
             spreadsheet_id: Google Sheets spreadsheet ID
         """
-        self.credentials_path = credentials_path or os.getenv(
-            "GOOGLE_SHEETS_CREDENTIALS_PATH",
-            "credentials.json"
-        )
-        self.token_path = token_path or os.getenv(
-            "GOOGLE_SHEETS_TOKEN_PATH",
-            "token.json"
-        )
+        self.credentials_path = credentials_path or get_google_credentials_path("sheets")
+        self.token_path = token_path or get_google_token_path("sheets")
         self.spreadsheet_id = spreadsheet_id or os.getenv(
             "GOOGLE_SHEETS_SPREADSHEET_ID"
         )
@@ -333,18 +328,18 @@ class GoogleSheetsClient:
 
 def get_google_sheets_client() -> Optional[GoogleSheetsClient]:
     """Factory function to get configured Google Sheets client.
-    
+
     Returns:
         GoogleSheetsClient instance if configured, None otherwise.
     """
     try:
-        credentials_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH")
-        token_path = os.getenv("GOOGLE_SHEETS_TOKEN_PATH")
+        credentials_path = get_google_credentials_path("sheets")
+        token_path = get_google_token_path("sheets")
         spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-        
-        if not credentials_path or not spreadsheet_id:
+
+        if not os.path.exists(credentials_path) or not spreadsheet_id:
             return None
-        
+
         return GoogleSheetsClient(
             credentials_path=credentials_path,
             token_path=token_path,

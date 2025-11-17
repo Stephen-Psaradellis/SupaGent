@@ -17,6 +17,7 @@ from app.routes import (
     compliance,
     agent_tests,
     config,
+    google_oauth,
 )
 from app.routes import unsubscribe
 
@@ -39,5 +40,6 @@ def register_routes(router: APIRouter) -> None:
     router.include_router(crm.router, tags=["crm"])
     router.include_router(compliance.router, tags=["compliance"])
     router.include_router(agent_tests.router, tags=["agent-tests"])
+    router.include_router(google_oauth.router, tags=["oauth"])
     router.include_router(unsubscribe.router, tags=["unsubscribe"])
 

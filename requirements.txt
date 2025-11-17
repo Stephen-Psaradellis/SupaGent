@@ -52,6 +52,7 @@ playwright>=1.40.0
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0
 alembic>=1.13.0  # For database migrations
+cryptography>=42.0.0  # For token encryption
 
 # Development and Testing
 pytest>=7.4.0
