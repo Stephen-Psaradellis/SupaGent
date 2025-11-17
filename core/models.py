@@ -219,7 +219,7 @@ class GoogleTokens(Base):
     def encrypt_token(self, token: str) -> str:
         """Encrypt a token for storage."""
         if not token:
-            return token
+            raise ValueError("Cannot encrypt empty or None token")
         f = Fernet(self._get_encryption_key())
         return f.encrypt(token.encode()).decode()
 
@@ -232,6 +232,8 @@ class GoogleTokens(Base):
 
     def set_access_token(self, token: str):
         """Set and encrypt access token."""
+        if not token:
+            raise ValueError("Access token cannot be empty or None")
         self.access_token = self.encrypt_token(token)
 
     def get_access_token(self) -> str:
