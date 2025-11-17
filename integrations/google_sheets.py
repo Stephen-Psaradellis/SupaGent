@@ -1,87 +1,57 @@
 """
-Google Sheets API integration.
+Google Sheets API integration with secure OAuth2 token management.
 
 Provides functionality to interact with Google Sheets API for:
 - Reading client data
 - Adding client data
 - Posting call/interaction data
+
+Uses database-stored tokens with automatic refresh, no filesystem credentials required.
 """
 from __future__ import annotations
 
 import os
 from typing import Dict, Any, Optional, List
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from core.google_token_manager import get_google_credentials_path, get_google_token_path
+from core.google_oauth_manager import get_sheets_oauth_manager
 
 
 # Scopes required for Sheets API
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets.readonly',
+    'https://www.googleapis.com/auth/spreadsheets'
+]
 
 
 class GoogleSheetsClient:
-    """Client for interacting with Google Sheets API.
-    
-    Handles authentication and provides methods for sheet operations.
+    """Client for interacting with Google Sheets API using database-stored tokens.
+
+    Handles authentication with automatic token refresh and provides methods for sheet operations.
     """
-    
-    def __init__(
-        self,
-        credentials_path: Optional[str] = None,
-        token_path: Optional[str] = None,
-        spreadsheet_id: Optional[str] = None,
-    ):
+
+    def __init__(self, spreadsheet_id: Optional[str] = None):
         """Initialize Google Sheets client.
 
         Args:
-            credentials_path: Path to OAuth2 credentials JSON file
-            token_path: Path to store/load OAuth2 token
             spreadsheet_id: Google Sheets spreadsheet ID
         """
-        self.credentials_path = credentials_path or get_google_credentials_path("sheets")
-        self.token_path = token_path or get_google_token_path("sheets")
-        self.spreadsheet_id = spreadsheet_id or os.getenv(
-            "GOOGLE_SHEETS_SPREADSHEET_ID"
-        )
+        self.spreadsheet_id = spreadsheet_id or os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+        self.oauth_manager = get_sheets_oauth_manager()
         self.service = None
         if self.spreadsheet_id:
             self._authenticate()
     
     def _authenticate(self) -> None:
-        """Authenticate with Google Sheets API."""
-        creds = None
-        
-        # Load existing token
-        if os.path.exists(self.token_path):
-            try:
-                creds = Credentials.from_authorized_user_file(
-                    self.token_path, SCOPES
-                )
-            except Exception:
-                pass
-        
-        # If no valid credentials, get new ones
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                if not os.path.exists(self.credentials_path):
-                    raise FileNotFoundError(
-                        f"Credentials file not found: {self.credentials_path}. "
-                        "Please download OAuth2 credentials from Google Cloud Console."
-                    )
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path, SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-            
-            # Save credentials for next run
-            with open(self.token_path, 'w') as token:
-                token.write(creds.to_json())
-        
+        """Authenticate with Google Sheets API using stored tokens."""
+        creds = self.oauth_manager.get_credentials()
+
+        if not creds:
+            raise ValueError(
+                "No valid Google OAuth tokens found. "
+                "Please complete OAuth flow at /oauth/start"
+            )
+
         self.service = build('sheets', 'v4', credentials=creds)
     
     def get_clients(
@@ -330,21 +300,18 @@ def get_google_sheets_client() -> Optional[GoogleSheetsClient]:
     """Factory function to get configured Google Sheets client.
 
     Returns:
-        GoogleSheetsClient instance if configured, None otherwise.
+        GoogleSheetsClient instance if OAuth tokens are available, None otherwise.
     """
     try:
-        credentials_path = get_google_credentials_path("sheets")
-        token_path = get_google_token_path("sheets")
-        spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-
-        if not os.path.exists(credentials_path) or not spreadsheet_id:
+        oauth_manager = get_sheets_oauth_manager()
+        if not oauth_manager.is_authenticated():
             return None
 
-        return GoogleSheetsClient(
-            credentials_path=credentials_path,
-            token_path=token_path,
-            spreadsheet_id=spreadsheet_id,
-        )
+        spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+        if not spreadsheet_id:
+            return None
+
+        return GoogleSheetsClient(spreadsheet_id=spreadsheet_id)
     except Exception:
         return None
 
